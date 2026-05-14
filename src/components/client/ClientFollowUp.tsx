@@ -60,9 +60,8 @@ export function ClientFollowUp({ clientId }: { clientId: string }) {
         <div className="bg-red-50 text-red-800 p-4 rounded-xl flex items-start gap-3 border border-red-100">
           <AlertCircle className="h-5 w-5 mt-0.5 text-red-500 shrink-0" />
           <div className="flex-1">
-            <p className="font-medium text-sm">Erro ao gerar follow-up</p>
-            <p className="text-sm opacity-80 mb-3">
-              Não foi possível criar a mensagem. Verifique a conexão e tente novamente.
+            <p className="font-medium text-sm mb-3">
+              Erro ao gerar mensagem. Por favor, tente novamente
             </p>
             <Button
               onClick={handleGenerate}
@@ -105,7 +104,7 @@ export function ClientFollowUp({ clientId }: { clientId: string }) {
         <div className="pt-2">
           <p className="text-slate-500 text-sm">
             Clique em <span className="font-semibold">Gerar Follow-up</span> para criar uma mensagem
-            personalizada usando inteligência artificial baseada no histórico do cliente.
+            personalizada.
           </p>
         </div>
       )}
