@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Recovery from './pages/Recovery'
 import ClientDetailsPage from './pages/ClientDetails'
+import NewMeeting from './pages/NewMeeting'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -29,6 +30,7 @@ const App = () => (
               <Route element={<Layout />}>
                 <Route path="/" element={<Index />} />
                 <Route path="/clientes/:id" element={<ClientDetailsPage />} />
+                <Route path="/nova-reuniao" element={<NewMeeting />} />
               </Route>
             </Route>
 

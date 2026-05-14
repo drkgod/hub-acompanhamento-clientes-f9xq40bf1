@@ -2,10 +2,12 @@ import useMainStore from '@/stores/useMainStore'
 import { Board } from '@/components/kanban/Board'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export default function Index() {
   const { isLoading, isError } = useMainStore()
+  const navigate = useNavigate()
 
   if (isError) {
     return (
@@ -61,5 +63,16 @@ export default function Index() {
     )
   }
 
-  return <Board />
+  return (
+    <>
+      <Board />
+      <Button
+        onClick={() => navigate('/nova-reuniao')}
+        className="fixed bottom-8 right-8 h-14 rounded-full px-6 shadow-xl shadow-indigo-200/50 bg-indigo-600 hover:bg-indigo-700 text-white z-50 flex items-center gap-2 group transition-all duration-300 hover:scale-105"
+      >
+        <Plus className="h-5 w-5" />
+        <span className="font-medium text-base hidden sm:inline">Nova Reunião</span>
+      </Button>
+    </>
+  )
 }
