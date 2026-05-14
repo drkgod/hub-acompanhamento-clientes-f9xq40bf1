@@ -11,6 +11,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Recovery from './pages/Recovery'
+import ClientDetailsPage from './pages/ClientDetails'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -27,6 +28,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Index />} />
+                <Route path="/clientes/:id" element={<ClientDetailsPage />} />
               </Route>
             </Route>
 
