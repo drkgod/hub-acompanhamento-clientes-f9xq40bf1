@@ -13,6 +13,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Recovery from './pages/Recovery'
 import ClientDetailsPage from './pages/ClientDetails'
+import ClientWhatsAppPage from './pages/ClientWhatsApp'
 import NewMeeting from './pages/NewMeeting'
 import Integrations from './pages/Integrations'
 import Digest from './pages/Digest'
@@ -35,6 +36,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/pipeline" element={<Index />} />
                 <Route path="/clientes/:id" element={<ClientDetailsPage />} />
+                <Route path="/clientes/:id/whatsapp" element={<ClientWhatsAppPage />} />
                 <Route path="/nova-reuniao" element={<NewMeeting />} />
                 <Route path="/integracoes" element={<Integrations />} />
                 <Route path="/digest" element={<Digest />} />

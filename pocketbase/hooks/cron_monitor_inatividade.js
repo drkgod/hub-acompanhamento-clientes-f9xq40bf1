@@ -73,7 +73,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
 
           if (!dateToUse && chatId) {
             const res2 = $http.send({
-              url: `${baseUrl}/chat/messages/${chatId}?limit=1`,
+              url: `${baseUrl}/chat/messages/${chatId}?limit=50&page=1`,
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',

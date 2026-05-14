@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Building, Mail, Phone } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { ArrowLeft, Building, Mail, Phone, MessageCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getInactivity } from '@/lib/date-utils'
@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 export function ClientHeader({ client }: { client: Client }) {
   const inactivity = getInactivity(client.ultimo_contato)
   const stage = client.expand?.estagio_id
+  const location = useLocation()
+  const isWhatsAppPage = location.pathname.endsWith('/whatsapp')
 
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-5 border rounded-xl shadow-sm">
@@ -53,9 +55,23 @@ export function ClientHeader({ client }: { client: Client }) {
         </div>
       </div>
 
-      <Button asChild className="w-full md:w-auto">
-        <Link to="/">Voltar ao Pipeline</Link>
-      </Button>
+      <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+        {!isWhatsAppPage ? (
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+            <Link to={`/clientes/${client.id}/whatsapp`}>
+              <MessageCircle className="w-4 h-4 mr-2" />
+              WhatsApp
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+            <Link to={`/clientes/${client.id}`}>Voltar ao Perfil</Link>
+          </Button>
+        )}
+        <Button asChild className="w-full sm:w-auto">
+          <Link to="/">Pipeline</Link>
+        </Button>
+      </div>
     </div>
   )
 }
