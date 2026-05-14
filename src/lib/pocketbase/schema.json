@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-14T18:58:45.912Z",
+  "generatedAt": "2026-05-14T19:03:10.494Z",
   "collections": [
     {
       "name": "users",
@@ -255,9 +255,15 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "recording_id",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE UNIQUE INDEX `idx_meetings_recording_id` ON `meetings` (recording_id)"]
     },
     {
       "name": "transcripts",
