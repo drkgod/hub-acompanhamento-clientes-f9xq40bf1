@@ -12,6 +12,7 @@ import { ClientMeetings } from '@/components/client/ClientMeetings'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Target, TrendingUp, Map as MapIcon, CalendarDays, RefreshCcw } from 'lucide-react'
+import { ClientFollowUp } from '@/components/client/ClientFollowUp'
 import {
   Accordion,
   AccordionContent,
@@ -102,6 +103,9 @@ export default function ClientDetailsPage() {
             <ClientSummary clientId={data.client.id} meetingCount={data.meetings.length} />
             <div className="border-t border-slate-100 pt-6">
               <ClientNotes clientId={data.client.id} initialNotes={data.client.notas_gerais} />
+            </div>
+            <div className="border-t border-slate-100 pt-6">
+              <ClientFollowUp clientId={data.client.id} />
             </div>
           </div>
 

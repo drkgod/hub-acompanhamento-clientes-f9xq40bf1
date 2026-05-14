@@ -30,3 +30,7 @@ export const getClientSummary = async (clientId: string) => {
 export const updateClientNotes = async (clientId: string, notas_gerais: string) => {
   return pb.collection('clients').update(clientId, { notas_gerais })
 }
+
+export const generateClientFollowUp = async (clientId: string) => {
+  return pb.send(`/backend/v1/clients/${clientId}/followup`, { method: 'POST' })
+}

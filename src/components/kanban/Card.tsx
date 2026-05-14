@@ -1,13 +1,15 @@
 import { useState, DragEvent } from 'react'
 import { Client } from '@/types'
 import { getInactivity } from '@/lib/date-utils'
-import { Building2, GripVertical } from 'lucide-react'
+import { Building2, GripVertical, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function Card({ client, index }: { client: Client; index: number }) {
   const [isDragging, setIsDragging] = useState(false)
   const inactivity = getInactivity(client.ultimo_contato)
+
+  const isCritico = client.status_inatividade === 'critico'
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData('clientId', client.id)
@@ -29,8 +31,11 @@ export function Card({ client, index }: { client: Client; index: number }) {
       aria-describedby={`status-inatividade-${client.id}`}
       style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
       className={cn(
-        'group flex flex-col p-4 bg-white rounded-lg border border-slate-200 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:border-slate-300 transition-all duration-200 animate-in fade-in zoom-in-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+        'group flex flex-col p-4 bg-white rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 animate-in fade-in zoom-in-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
         isDragging ? 'opacity-40 rotate-2 scale-95 shadow-lg z-10' : 'opacity-100',
+        isCritico
+          ? 'border border-slate-800/40 bg-slate-50/50 ring-1 ring-slate-200'
+          : 'border border-slate-200 hover:border-slate-300',
       )}
     >
       <div className="flex items-start justify-between mb-2">
@@ -46,8 +51,19 @@ export function Card({ client, index }: { client: Client; index: number }) {
               <p>Último contato {inactivity.text}</p>
             </TooltipContent>
           </Tooltip>
-          <h4 className="font-semibold text-sm text-slate-800 truncate" title={client.nome}>
+          <h4
+            className="font-semibold text-sm text-slate-800 truncate flex items-center gap-1.5"
+            title={client.nome}
+          >
             {client.nome}
+            {isCritico && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <AlertTriangle className="h-3.5 w-3.5 text-slate-600 shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent>Status Crítico</TooltipContent>
+              </Tooltip>
+            )}
           </h4>
         </div>
         <GripVertical className="h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
