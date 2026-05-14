@@ -6,6 +6,7 @@ import { AlertCircle, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useRealtime } from '@/hooks/use-realtime'
 import pb from '@/lib/pocketbase/client'
+import { ImportTldvDialog } from '@/components/ImportTldvDialog'
 
 export default function Index() {
   const { isLoading, isError } = useMainStore()
@@ -78,13 +79,16 @@ export default function Index() {
   return (
     <>
       <Board />
-      <Button
-        onClick={() => navigate('/nova-reuniao')}
-        className="fixed bottom-8 right-8 h-14 rounded-full px-6 shadow-xl shadow-indigo-200/50 bg-indigo-600 hover:bg-indigo-700 text-white z-50 flex items-center gap-2 group transition-all duration-300 hover:scale-105"
-      >
-        <Plus className="h-5 w-5" />
-        <span className="font-medium text-base hidden sm:inline">Nova Reunião</span>
-      </Button>
+      <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
+        <ImportTldvDialog />
+        <Button
+          onClick={() => navigate('/nova-reuniao')}
+          className="h-14 rounded-full px-6 shadow-xl shadow-indigo-200/50 bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 group transition-all duration-300 hover:scale-105"
+        >
+          <Plus className="h-5 w-5" />
+          <span className="font-medium text-base hidden sm:inline">Nova Reunião</span>
+        </Button>
+      </div>
     </>
   )
 }
