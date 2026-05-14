@@ -24,7 +24,7 @@ routerAdd(
     let res
     try {
       res = $http.send({
-        url: `https://api.tldv.io/v1/meetings?participant_email=${encodeURIComponent(email)}`,
+        url: `https://pasta.tldv.io/v1alpha1/meetings?participant_email=${encodeURIComponent(email)}`,
         method: 'GET',
         headers: { 'x-api-key': apiKey },
         timeout: 30,
@@ -58,7 +58,10 @@ routerAdd(
       client = new Record(clientsCol)
       client.set(
         'nome',
-        meetingData.participant_name || meetingData.guest_name || email.split('@')[0],
+        meetingData.participant_name ||
+          meetingData.guest_name ||
+          meetingData.name ||
+          email.split('@')[0],
       )
       client.set('empresa', meetingData.company || 'Empresa Importada')
       client.set('email', email)
@@ -70,8 +73,11 @@ routerAdd(
     const meetingsCol = $app.findCollectionByNameOrId('meetings')
     const meeting = new Record(meetingsCol)
     meeting.set('client_id', client.id)
-    meeting.set('titulo', meetingData.title || 'Reunião Importada (tl;dv)')
-    meeting.set('data', meetingData.created_at || new Date().toISOString())
+    meeting.set('titulo', meetingData.name || meetingData.title || 'Reunião Importada (tl;dv)')
+    meeting.set(
+      'data',
+      meetingData.happenedAt || meetingData.created_at || new Date().toISOString(),
+    )
     meeting.set(
       'duracao_minutos',
       meetingData.duration ? Math.round(meetingData.duration / 60) : 30,

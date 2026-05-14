@@ -64,16 +64,22 @@ routerAdd('POST', '/backend/v1/tldv-webhook', (e) => {
     if (meetingRecord) {
       clientRecord = $app.findRecordById('clients', meetingRecord.getString('client_id'))
     } else {
-      const titulo_reuniao = payloadData.title || 'Reunião TLDV'
-      const data_reuniao = payloadData.createdAt || payloadData.date || new Date().toISOString()
+      const titulo_reuniao = payloadData.name || payloadData.title || 'Reunião TLDV'
+      const data_reuniao =
+        payloadData.happenedAt ||
+        payloadData.createdAt ||
+        payloadData.date ||
+        new Date().toISOString()
       const duracao_sec = payloadData.duration || 0
       const duracao_minutos = Math.round(Number(duracao_sec) / 60)
       const plataforma = payloadData.platform || ''
-      const participantes = payloadData.participants || []
+      const invitees = payloadData.invitees || payloadData.participants || []
 
-      const participantesStr = Array.isArray(participantes)
-        ? participantes.join(' ')
-        : String(participantes || '')
+      const participantesStr = Array.isArray(invitees)
+        ? invitees
+            .map((inv) => (typeof inv === 'string' ? inv : inv.name || inv.email || ''))
+            .join(' ')
+        : String(invitees || '')
       const searchString = (participantesStr + ' ' + titulo_reuniao).toLowerCase()
 
       const clients = $app.findRecordsByFilter(
@@ -129,10 +135,14 @@ routerAdd('POST', '/backend/v1/tldv-webhook', (e) => {
         const clientCol = $app.findCollectionByNameOrId('clients')
         clientRecord = new Record(clientCol)
         let extractedName = 'Novo Cliente TLDV'
-        if (Array.isArray(participantes) && participantes.length > 0) {
-          extractedName = participantes[0]
-        } else if (typeof participantes === 'string' && participantes.trim().length > 0) {
-          extractedName = participantes.split(',')[0]
+        if (Array.isArray(invitees) && invitees.length > 0) {
+          const firstInv = invitees[0]
+          extractedName =
+            typeof firstInv === 'string'
+              ? firstInv
+              : firstInv.name || firstInv.email || 'Novo Cliente TLDV'
+        } else if (typeof invitees === 'string' && invitees.trim().length > 0) {
+          extractedName = invitees.split(',')[0]
         }
         clientRecord.set('nome', extractedName)
         clientRecord.set('estagio_id', stageId)
@@ -157,22 +167,63 @@ routerAdd('POST', '/backend/v1/tldv-webhook', (e) => {
     if (eventName === 'TranscriptReady') {
       let transcriptText = ''
       let fetchError = null
-      const delays = [2000, 4000, 8000]
-      let attempt = 0
 
-      while (attempt <= 3) {
-        try {
-          const res = $http.send({
-            url: `https://api.tldv.io/v1/meetings/${id}/transcript`,
-            method: 'GET',
-            headers: {
-              'x-api-key': tldvKey,
-              Authorization: 'Bearer ' + tldvKey,
-            },
-            timeout: 15,
-          })
+      if (payloadData.transcript) {
+        transcriptText = payloadData.transcript
+      } else if (payloadData.segments && Array.isArray(payloadData.segments)) {
+        transcriptText = payloadData.segments
+          .map((seg) => (seg.speaker || 'Desconhecido') + ': ' + seg.text)
+          .join('\n')
+      } else {
+        const delays = [2000, 4000, 8000]
+        let attempt = 0
 
-          if (res.statusCode >= 500 && res.statusCode < 600) {
+        while (attempt <= 3) {
+          try {
+            const res = $http.send({
+              url: `https://pasta.tldv.io/v1alpha1/meetings/${id}/transcript`,
+              method: 'GET',
+              headers: {
+                'x-api-key': tldvKey,
+              },
+              timeout: 15,
+            })
+
+            if (res.statusCode >= 500 && res.statusCode < 600) {
+              if (attempt < 3) {
+                const delay = delays[attempt]
+                const start = Date.now()
+                while (Date.now() - start < delay) {}
+                attempt++
+                continue
+              } else {
+                fetchError = new Error(`TLDV API returned ${res.statusCode}`)
+                break
+              }
+            }
+
+            if (res.statusCode !== 200) {
+              fetchError = new Error(`TLDV API returned ${res.statusCode}`)
+              break
+            }
+
+            const resJson = res.json || {}
+
+            if (resJson.transcript) {
+              transcriptText = resJson.transcript
+            } else if (resJson.data && Array.isArray(resJson.data)) {
+              transcriptText = resJson.data
+                .map((seg) => (seg.speaker || 'Desconhecido') + ': ' + seg.text)
+                .join('\n')
+            } else if (resJson.segments && Array.isArray(resJson.segments)) {
+              transcriptText = resJson.segments
+                .map((seg) => (seg.speaker || 'Desconhecido') + ': ' + seg.text)
+                .join('\n')
+            } else {
+              transcriptText = resJson.fullText || resJson.text || ''
+            }
+            break
+          } catch (err) {
             if (attempt < 3) {
               const delay = delays[attempt]
               const start = Date.now()
@@ -180,29 +231,9 @@ routerAdd('POST', '/backend/v1/tldv-webhook', (e) => {
               attempt++
               continue
             } else {
-              fetchError = new Error(`TLDV API returned ${res.statusCode}`)
+              fetchError = err
               break
             }
-          }
-
-          if (res.statusCode !== 200) {
-            fetchError = new Error(`TLDV API returned ${res.statusCode}`)
-            break
-          }
-
-          const resJson = res.json || {}
-          transcriptText = resJson.fullText || resJson.text || resJson.transcript || ''
-          break
-        } catch (err) {
-          if (attempt < 3) {
-            const delay = delays[attempt]
-            const start = Date.now()
-            while (Date.now() - start < delay) {}
-            attempt++
-            continue
-          } else {
-            fetchError = err
-            break
           }
         }
       }

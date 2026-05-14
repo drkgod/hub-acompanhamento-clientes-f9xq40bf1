@@ -1,20 +1,42 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import pb from '@/lib/pocketbase/client'
 import { Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function Integrations() {
-  const [copiedToken, setCopiedToken] = useState(false)
+  const [copiedSecret, setCopiedSecret] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [tldvInfo, setTldvInfo] = useState<{ secret: string; instanceUrl: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const token = pb.authStore.token
-  const webhookUrl = `${import.meta.env.VITE_POCKETBASE_URL}/backend/v1/tldv-webhook`
+  useEffect(() => {
+    const fetchInfo = async () => {
+      try {
+        const res = await pb.send<{ secret: string; instanceUrl: string }>(
+          '/backend/v1/tldv-info',
+          { method: 'GET' },
+        )
+        setTldvInfo(res)
+      } catch (err) {
+        console.error('Failed to load tldv info', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchInfo()
+  }, [])
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(`Bearer ${token}`)
-    setCopiedToken(true)
-    setTimeout(() => setCopiedToken(false), 2000)
+  const webhookUrl = tldvInfo?.instanceUrl
+    ? `${tldvInfo.instanceUrl}/backend/v1/tldv-webhook`
+    : `${import.meta.env.VITE_POCKETBASE_URL}/backend/v1/tldv-webhook`
+
+  const handleCopySecret = () => {
+    if (!tldvInfo?.secret) return
+    navigator.clipboard.writeText(tldvInfo.secret)
+    setCopiedSecret(true)
+    setTimeout(() => setCopiedSecret(false), 2000)
   }
 
   const handleCopyUrl = () => {
@@ -60,8 +82,8 @@ export default function Integrations() {
               </li>
               <li>Adicione a URL do webhook fornecida abaixo</li>
               <li>
-                Nos cabeçalhos (Headers) do webhook, adicione a chave <code>Authorization</code> com
-                o valor do seu token (abaixo)
+                Nos cabeçalhos (Headers) do webhook, adicione a chave <code>x-api-key</code> com o
+                valor do seu Webhook Secret (abaixo)
               </li>
               <li>
                 Certifique-se de que os eventos <strong>MeetingReady</strong> e{' '}
@@ -72,46 +94,60 @@ export default function Integrations() {
           </div>
 
           <div className="space-y-5 border-t pt-5">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold">URL do Webhook</label>
-              <div className="flex gap-2 items-center">
-                <code className="flex-1 p-2.5 bg-muted rounded-md text-sm break-all font-mono">
-                  {webhookUrl}
-                </code>
-                <Button variant="secondary" size="icon" onClick={handleCopyUrl} title="Copiar URL">
-                  {copiedUrl ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">URL Pública do Webhook</label>
+                  <div className="flex gap-2 items-center">
+                    <code className="flex-1 p-2.5 bg-muted rounded-md text-sm break-all font-mono">
+                      {webhookUrl}
+                    </code>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleCopyUrl}
+                      title="Copiar URL"
+                    >
+                      {copiedUrl ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold">Authorization Header Token</label>
-              <div className="flex gap-2 items-center">
-                <code className="flex-1 p-2.5 bg-muted rounded-md text-sm break-all truncate font-mono">
-                  Bearer {token}
-                </code>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={handleCopyToken}
-                  title="Copiar Token"
-                >
-                  {copiedToken ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Para manter a segurança, nunca compartilhe seu token publicamente. Ele é associado à
-                sua conta atual.
-              </p>
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">TLDV Webhook Secret (x-api-key)</label>
+                  <div className="flex gap-2 items-center">
+                    <code className="flex-1 p-2.5 bg-muted rounded-md text-sm break-all truncate font-mono">
+                      {tldvInfo?.secret || 'Secret não configurado'}
+                    </code>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleCopySecret}
+                      title="Copiar Secret"
+                      disabled={!tldvInfo?.secret}
+                    >
+                      {copiedSecret ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Utilize este secret no cabeçalho x-api-key para autenticar o envio dos dados.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
