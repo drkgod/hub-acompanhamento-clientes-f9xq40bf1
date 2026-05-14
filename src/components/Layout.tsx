@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 import { useDebounce } from '@/hooks/use-debounce'
 import useMainStore from '@/stores/useMainStore'
 import { useAuth } from '@/hooks/use-auth'
+import { NotificationsPanel } from './NotificationsPanel'
 
 export default function Layout() {
   const [search, setSearch] = useState('')
@@ -33,6 +34,7 @@ export default function Layout() {
             <h1 className="text-xl font-bold text-slate-800 hidden lg:block whitespace-nowrap tracking-tight">
               Hub de Acompanhamento
             </h1>
+            <NotificationsPanel />
           </div>
 
           <div className="flex-1 max-w-xl mx-auto relative group">

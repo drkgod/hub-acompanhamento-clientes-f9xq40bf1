@@ -79,3 +79,14 @@ export interface RoadmapItem {
   user_id: string
   created: string
 }
+
+export interface Notification {
+  id: string
+  client_id?: string
+  tipo?: string
+  titulo?: string
+  mensagem?: string
+  lida?: boolean
+  user_id: string
+  created: string
+}
