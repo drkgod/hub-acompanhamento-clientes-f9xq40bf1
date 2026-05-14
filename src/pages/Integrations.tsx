@@ -63,7 +63,11 @@ export default function Integrations() {
                 Nos cabeçalhos (Headers) do webhook, adicione a chave <code>Authorization</code> com
                 o valor do seu token (abaixo)
               </li>
-              <li>Habilite o envio automático de transcrições após reuniões gravadas</li>
+              <li>
+                Certifique-se de que os eventos <strong>MeetingReady</strong> e{' '}
+                <strong>TranscriptReady</strong> estão selecionados na configuração do webhook no
+                tl;dv
+              </li>
             </ol>
           </div>
 
