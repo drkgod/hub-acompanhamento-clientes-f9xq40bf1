@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 export function Card({ client, index }: { client: Client; index: number }) {
   const [isDragging, setIsDragging] = useState(false)
-  const inactivity = getInactivity(client.lastContact)
+  const inactivity = getInactivity(client.ultimo_contato)
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData('clientId', client.id)
@@ -25,7 +25,7 @@ export function Card({ client, index }: { client: Client; index: number }) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       tabIndex={0}
-      aria-label={`Mover cliente ${client.name}`}
+      aria-label={`Mover cliente ${client.nome}`}
       aria-describedby={`status-inatividade-${client.id}`}
       style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
       className={cn(
@@ -46,8 +46,8 @@ export function Card({ client, index }: { client: Client; index: number }) {
               <p>Último contato {inactivity.text}</p>
             </TooltipContent>
           </Tooltip>
-          <h4 className="font-semibold text-sm text-slate-800 truncate" title={client.name}>
-            {client.name}
+          <h4 className="font-semibold text-sm text-slate-800 truncate" title={client.nome}>
+            {client.nome}
           </h4>
         </div>
         <GripVertical className="h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -55,7 +55,7 @@ export function Card({ client, index }: { client: Client; index: number }) {
 
       <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
         <Building2 className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate font-medium">{client.company}</span>
+        <span className="truncate font-medium">{client.empresa || 'Sem empresa'}</span>
       </div>
 
       <div className="mt-auto flex items-center">

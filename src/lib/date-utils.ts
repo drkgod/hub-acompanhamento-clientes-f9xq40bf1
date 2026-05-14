@@ -1,11 +1,19 @@
 import { differenceInDays, parseISO, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-export function getInactivity(dateStr: string) {
-  const date = parseISO(dateStr)
-  const days = differenceInDays(new Date(), date)
+export function getInactivity(dateStr?: string) {
+  if (!dateStr) {
+    return {
+      days: 0,
+      color: 'bg-slate-300',
+      text: 'Sem contato',
+    }
+  }
 
-  let color = 'bg-slate-500' // > 30 days
+  const parsed = parseISO(dateStr.replace(' ', 'T'))
+  const days = differenceInDays(new Date(), parsed)
+
+  let color = 'bg-slate-700' // > 30 days
   if (days < 7) {
     color = 'bg-green-500'
   } else if (days <= 14) {
@@ -17,6 +25,6 @@ export function getInactivity(dateStr: string) {
   return {
     days,
     color,
-    text: formatDistanceToNow(date, { addSuffix: true, locale: ptBR }),
+    text: formatDistanceToNow(parsed, { addSuffix: true, locale: ptBR }),
   }
 }

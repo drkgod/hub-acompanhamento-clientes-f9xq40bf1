@@ -1,15 +1,24 @@
 import { Outlet } from 'react-router-dom'
-import { Search, Plus, LayoutDashboard } from 'lucide-react'
+import { Search, Plus, LayoutDashboard, LogOut } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useState, useEffect } from 'react'
 import { useDebounce } from '@/hooks/use-debounce'
 import useMainStore from '@/stores/useMainStore'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Layout() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const { setSearchQuery } = useMainStore()
+  const { user, signOut } = useAuth()
 
   useEffect(() => {
     setSearchQuery(debouncedSearch)
@@ -37,10 +46,38 @@ export default function Layout() {
             />
           </div>
 
-          <Button className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95 h-10 px-4">
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline font-medium">Novo Cliente</span>
-          </Button>
+          <div className="flex items-center gap-3 shrink-0">
+            <Button className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95 h-10 px-4">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline font-medium">Novo Cliente</span>
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-10 w-10 rounded-full border border-slate-200 p-0 ml-2"
+                >
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className="bg-slate-100 text-slate-700 font-medium text-sm">
+                      {user?.name?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5 mb-1 truncate text-sm text-slate-500 bg-slate-50/50 rounded-sm">
+                  {user?.email}
+                </div>
+                <DropdownMenuItem
+                  onClick={signOut}
+                  className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer font-medium"
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> Sair da conta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 

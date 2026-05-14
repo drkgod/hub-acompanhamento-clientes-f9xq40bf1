@@ -1,13 +1,20 @@
 export interface Client {
   id: string
-  name: string
-  company: string
-  lastContact: string
-  stageId: string
+  nome: string
+  empresa: string
+  email?: string
+  telefone?: string
+  estagio_id: string
+  ultimo_contato?: string
+  status_inatividade?: string
+  dias_sem_contato?: number
+  notas_gerais?: string
+  user_id: string
 }
 
-export interface Stage {
+export interface PipelineStage {
   id: string
-  title: string
-  order: number
+  nome: string
+  ordem: number
+  cor?: string
 }

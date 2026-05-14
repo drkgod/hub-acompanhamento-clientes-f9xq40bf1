@@ -7,8 +7,10 @@ export function Board() {
 
   const filteredClients = clients.filter((c) => {
     const query = searchQuery.toLowerCase()
-    return c.name.toLowerCase().includes(query) || c.company.toLowerCase().includes(query)
+    return c.nome.toLowerCase().includes(query) || (c.empresa?.toLowerCase() || '').includes(query)
   })
+
+  if (!stages.length) return null
 
   return (
     <div className="flex-1 h-full flex flex-col pt-6 pb-2 px-4 sm:px-6 w-full max-w-[1600px] mx-auto overflow-hidden animate-in fade-in duration-500">
@@ -22,9 +24,9 @@ export function Board() {
                 value={stage.id}
                 className="shrink-0 px-4 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
               >
-                {stage.title}
+                {stage.nome}
                 <span className="ml-2 text-xs opacity-60">
-                  ({filteredClients.filter((c) => c.stageId === stage.id).length})
+                  ({filteredClients.filter((c) => c.estagio_id === stage.id).length})
                 </span>
               </TabsTrigger>
             ))}
@@ -37,7 +39,7 @@ export function Board() {
             >
               <Column
                 stage={stage}
-                clients={filteredClients.filter((c) => c.stageId === stage.id)}
+                clients={filteredClients.filter((c) => c.estagio_id === stage.id)}
               />
             </TabsContent>
           ))}
@@ -50,7 +52,7 @@ export function Board() {
           <Column
             key={stage.id}
             stage={stage}
-            clients={filteredClients.filter((c) => c.stageId === stage.id)}
+            clients={filteredClients.filter((c) => c.estagio_id === stage.id)}
           />
         ))}
 

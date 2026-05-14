@@ -1,5 +1,5 @@
 import { useState, DragEvent } from 'react'
-import { Stage, Client } from '@/types'
+import { PipelineStage, Client } from '@/types'
 import { Card } from './Card'
 import { Badge } from '@/components/ui/badge'
 import { FolderOpen, MoreHorizontal } from 'lucide-react'
@@ -14,7 +14,7 @@ import useMainStore from '@/stores/useMainStore'
 import { cn } from '@/lib/utils'
 
 interface ColumnProps {
-  stage: Stage
+  stage: PipelineStage
   clients: Client[]
 }
 
@@ -52,7 +52,7 @@ export function Column({ stage, clients }: ColumnProps) {
       <div className="flex items-center justify-between p-4 shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-slate-700 text-sm tracking-wide uppercase">
-            {stage.title}
+            {stage.nome}
           </h3>
           <Badge
             variant="secondary"
