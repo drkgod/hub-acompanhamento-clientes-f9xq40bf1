@@ -32,7 +32,7 @@ export default function Login() {
     if (error) {
       toast({ variant: 'destructive', title: 'Erro de Login', description: getErrorMessage(error) })
     } else {
-      navigate('/')
+      navigate('/dashboard')
     }
   }
 
