@@ -14,6 +14,7 @@ import Recovery from './pages/Recovery'
 import ClientDetailsPage from './pages/ClientDetails'
 import NewMeeting from './pages/NewMeeting'
 import Integrations from './pages/Integrations'
+import Digest from './pages/Digest'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/clientes/:id" element={<ClientDetailsPage />} />
                 <Route path="/nova-reuniao" element={<NewMeeting />} />
                 <Route path="/integracoes" element={<Integrations />} />
+                <Route path="/digest" element={<Digest />} />
               </Route>
             </Route>
 

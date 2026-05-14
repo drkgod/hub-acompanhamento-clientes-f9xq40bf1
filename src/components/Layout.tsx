@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
-import { Search, Plus, LayoutDashboard, LogOut } from 'lucide-react'
+import { Search, Plus, LayoutDashboard, LogOut, Newspaper } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -49,6 +50,16 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <Link to="/digest">
+              <Button
+                variant="outline"
+                className="h-10 px-4 text-slate-700 bg-white border-slate-200 hover:bg-slate-50 transition-all hidden sm:flex"
+              >
+                <Newspaper className="h-4 w-4 sm:mr-2 text-blue-600" />
+                <span className="hidden sm:inline font-medium">Resumo Diário</span>
+              </Button>
+            </Link>
+
             <Button className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95 h-10 px-4">
               <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline font-medium">Novo Cliente</span>
