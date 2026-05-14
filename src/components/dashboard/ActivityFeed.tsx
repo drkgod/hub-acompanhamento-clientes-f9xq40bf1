@@ -22,13 +22,11 @@ export function ActivityFeed() {
     try {
       setError(false)
       const [meetings, clients, goals] = await Promise.all([
-        pb
-          .collection('meetings')
-          .getList(1, 5, {
-            filter: `status = "processada"`,
-            sort: '-updated',
-            expand: 'client_id',
-          }),
+        pb.collection('meetings').getList(1, 5, {
+          filter: `status = "processada"`,
+          sort: '-updated',
+          expand: 'client_id',
+        }),
         pb.collection('clients').getList(1, 5, { sort: '-updated', expand: 'estagio_id' }),
         pb
           .collection('goals')
