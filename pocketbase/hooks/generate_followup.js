@@ -12,7 +12,7 @@ routerAdd(
     try {
       const result = $ai.agent('gerador-followup').chat({
         user_id: userId,
-        message: `Gere a mensagem de follow-up para o cliente de ID: ${id}. Busque as informações estritamente para este cliente (3 últimas reuniões, metas em andamento e pontos de melhoria não resolvidos) e redija de 2 a 4 parágrafos.`,
+        message: `Gere a mensagem de follow-up para o cliente de ID: ${id}.`,
       })
 
       return e.json(200, { content: result.content })

@@ -1,7 +1,7 @@
 import { useState, DragEvent } from 'react'
 import { Client } from '@/types'
 import { getInactivity } from '@/lib/date-utils'
-import { Building2, GripVertical, AlertTriangle } from 'lucide-react'
+import { Building2, GripVertical, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -34,7 +34,7 @@ export function Card({ client, index }: { client: Client; index: number }) {
         'group flex flex-col p-4 bg-white rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 animate-in fade-in zoom-in-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
         isDragging ? 'opacity-40 rotate-2 scale-95 shadow-lg z-10' : 'opacity-100',
         isCritico
-          ? 'border border-slate-800/40 bg-slate-50/50 ring-1 ring-slate-200'
+          ? 'border border-zinc-800 bg-zinc-50/50 ring-1 ring-zinc-200'
           : 'border border-slate-200 hover:border-slate-300',
       )}
     >
@@ -59,7 +59,7 @@ export function Card({ client, index }: { client: Client; index: number }) {
             {isCritico && (
               <Tooltip>
                 <TooltipTrigger>
-                  <AlertTriangle className="h-3.5 w-3.5 text-slate-600 shrink-0" />
+                  <AlertCircle className="h-4 w-4 text-zinc-600 shrink-0" />
                 </TooltipTrigger>
                 <TooltipContent>Status Crítico</TooltipContent>
               </Tooltip>

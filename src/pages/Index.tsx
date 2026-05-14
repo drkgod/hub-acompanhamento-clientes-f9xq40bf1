@@ -4,10 +4,22 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useRealtime } from '@/hooks/use-realtime'
+import pb from '@/lib/pocketbase/client'
 
 export default function Index() {
   const { isLoading, isError } = useMainStore()
   const navigate = useNavigate()
+
+  useRealtime('clients', async () => {
+    try {
+      const updatedClients = await pb.collection('clients').getFullList()
+      // Use the store's setState method to optimistically sync updates
+      useMainStore.setState({ clients: updatedClients })
+    } catch (err) {
+      console.error('Failed to sync real-time clients update', err)
+    }
+  })
 
   if (isError) {
     return (

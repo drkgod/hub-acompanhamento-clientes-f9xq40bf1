@@ -1,9 +1,18 @@
 cronAdd('monitor_inatividade', '0 0 * * *', () => {
-  const apiKey = $secrets.get('UAZAPI_KEY')
-  if (!apiKey) {
-    throw new BadRequestError(
-      'Configuração da UAZAPI não encontrada. Por favor, configure a chave UAZAPI_KEY.',
-    )
+  const token = $secrets.get('UAZAPI_TOKEN')
+  let baseUrl = $secrets.get('UAZAPI_BASE_URL')
+
+  if (!token || !baseUrl) {
+    $app
+      .logger()
+      .error(
+        'As chaves UAZAPI_TOKEN e UAZAPI_BASE_URL precisam ser configuradas no Secrets do Skip antes de usar o monitor de inatividade.',
+      )
+    return
+  }
+
+  if (baseUrl.endsWith('/')) {
+    baseUrl = baseUrl.slice(0, -1)
   }
 
   const clients = $app.findRecordsByFilter('clients', '1=1', '', 0, 0)
@@ -14,38 +23,74 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
     const telefone = client.getString('telefone')
 
     if (telefone) {
-      const cleanPhone = telefone.replace(/\D/g, '')
+      let cleanPhone = telefone.replace(/\D/g, '')
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = cleanPhone.substring(1)
+      }
+      if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+        cleanPhone = '55' + cleanPhone
+      }
+
       let retries = 0
       let success = false
-      let backoff = 2000 // 2s, 4s, 8s
+      let backoff = 2000
 
       while (retries < 3 && !success) {
         try {
-          const res = $http.send({
-            url: `https://api.uazapi.com/v1/chat/messages/${cleanPhone}`,
+          const res1 = $http.send({
+            url: `${baseUrl}/chat/findByPhone/${cleanPhone}`,
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${apiKey}`,
+              Authorization: `Bearer ${token}`,
             },
             timeout: 10,
           })
 
-          if (res.statusCode >= 500) {
-            throw new Error(`UAZAPI 5xx error: ${res.statusCode}`)
+          if (res1.statusCode === 401 || res1.statusCode === 403) {
+            $app
+              .logger()
+              .error('Token da UAZAPI inválido ou sem permissão', 'status', res1.statusCode)
+            break
           }
 
-          if (
-            res.statusCode === 200 &&
-            res.json &&
-            res.json.messages &&
-            res.json.messages.length > 0
-          ) {
-            const lastMsg = res.json.messages[0]
-            if (lastMsg && lastMsg.timestamp) {
-              dateToUse = new Date(lastMsg.timestamp)
+          if (res1.statusCode >= 500) {
+            throw new Error(`UAZAPI 5xx error: ${res1.statusCode}`)
+          }
+
+          let chatId = null
+          if (res1.statusCode === 200 && res1.json) {
+            const data = res1.json.data || res1.json
+            if (data && data.lastMessage && data.lastMessage.timestamp) {
+              const ts = data.lastMessage.timestamp
+              dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
+            } else if (data && data.id) {
+              chatId = data.id
+            } else if (data && data.chatId) {
+              chatId = data.chatId
             }
           }
+
+          if (!dateToUse && chatId) {
+            const res2 = $http.send({
+              url: `${baseUrl}/chat/messages/${chatId}?limit=1`,
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              timeout: 10,
+            })
+
+            if (res2.statusCode === 200 && res2.json) {
+              const msgs = res2.json.messages || res2.json.data || res2.json
+              if (Array.isArray(msgs) && msgs.length > 0 && msgs[0].timestamp) {
+                const ts = msgs[0].timestamp
+                dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
+              }
+            }
+          }
+
           success = true
         } catch (err) {
           retries++
@@ -61,22 +106,19 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
               )
           } else {
             const start = new Date().getTime()
-            while (new Date().getTime() - start < backoff) {
-              // block for exponential backoff (2s, 4s)
-            }
+            while (new Date().getTime() - start < backoff) {}
             backoff *= 2
           }
         }
       }
     }
 
-    if (!dateToUse) {
+    if (!dateToUse || isNaN(dateToUse.getTime())) {
       const ucStr = client.getString('ultimo_contato')
       const createdStr = client.getString('created')
       dateToUse = ucStr ? new Date(ucStr) : new Date(createdStr)
     }
 
-    // Calculate difference in days
     const diffTime = now.getTime() - dateToUse.getTime()
     const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)))
 
@@ -95,7 +137,6 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
 
       const userId = client.getString('user_id')
 
-      // Notifications logic
       if (status === 'vermelho' && oldStatus !== 'vermelho') {
         const notif = new Record($app.findCollectionByNameOrId('notifications'))
         notif.set('client_id', client.id)
