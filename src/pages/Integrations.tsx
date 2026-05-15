@@ -349,4 +349,11 @@ export default function Integrations() {
                     </p>
                   </div>
                 </>
-           
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
