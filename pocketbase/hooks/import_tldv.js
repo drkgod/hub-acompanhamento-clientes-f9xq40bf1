@@ -25,10 +25,10 @@ routerAdd(
     let invitee = null
 
     let page = 1
-    const limit = 50
-    let hasMore = true
+    const limit = 20
+    const maxPages = 3
 
-    while (hasMore) {
+    searchLoop: while (page <= maxPages) {
       let res
       try {
         res = $http.send({
@@ -48,25 +48,49 @@ routerAdd(
         !Array.isArray(res.json.meetings) ||
         res.json.meetings.length === 0
       ) {
-        hasMore = false
         break
       }
 
-      for (const m of res.json.meetings) {
-        if (Array.isArray(m.invitees)) {
-          const foundInvitee = m.invitees.find(
-            (i) => i.email && i.email.toLowerCase() === email.toLowerCase(),
-          )
-          if (foundInvitee) {
-            meetingData = m
-            invitee = foundInvitee
-            break
+      for (const listMeeting of res.json.meetings) {
+        if (!listMeeting.id) continue
+
+        let detailRes
+        try {
+          detailRes = $http.send({
+            url: `https://pasta.tldv.io/v1alpha1/meetings/${listMeeting.id}`,
+            method: 'GET',
+            headers: { 'x-api-key': apiKey },
+            timeout: 30,
+          })
+        } catch (err) {
+          $app.logger().error('tl;dv API meeting detail transport error', 'error', err.message)
+          continue
+        }
+
+        if (detailRes.statusCode === 200 && detailRes.json) {
+          const m = detailRes.json
+          if (Array.isArray(m.invitees)) {
+            const emails = m.invitees.map((i) => i.email).filter(Boolean)
+            $app
+              .logger()
+              .info(
+                'Emails encontrados na reunião',
+                'meeting_id',
+                m.id,
+                'emails',
+                emails.join(', '),
+              )
+
+            const foundInvitee = m.invitees.find(
+              (i) => i.email && i.email.toLowerCase() === email.toLowerCase(),
+            )
+            if (foundInvitee) {
+              meetingData = m
+              invitee = foundInvitee
+              break searchLoop
+            }
           }
         }
-      }
-
-      if (meetingData) {
-        break
       }
 
       page++
@@ -74,7 +98,7 @@ routerAdd(
 
     if (!meetingData) {
       return e.notFoundError(
-        `Nenhuma gravação encontrada para o email ${email} na sua conta tl;dv. Verifique se o participante está listado na reunião.`,
+        `Nenhuma gravação encontrada para o email ${email} nas suas últimas 60 reuniões no tl;dv.`,
       )
     }
 
