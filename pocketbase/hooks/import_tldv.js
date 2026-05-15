@@ -50,17 +50,19 @@ routerAdd(
       )
     }
 
-    const currentUserEmail = e.auth ? e.auth.getString('email') : ''
     let invitee = null
     if (Array.isArray(meetingData.invitees)) {
-      invitee = meetingData.invitees.find((i) => i.email && i.email !== currentUserEmail)
+      invitee = meetingData.invitees.find(
+        (i) => i.email && i.email.toLowerCase() !== email.toLowerCase(),
+      )
     }
 
-    const finalEmail = invitee && invitee.email ? invitee.email : email
-    const finalName = invitee && invitee.name ? invitee.name : finalEmail.split('@')[0]
+    const finalEmail = invitee && invitee.email ? invitee.email : ''
+    const finalName = invitee && invitee.name ? invitee.name : email.split('@')[0]
 
     let client
     try {
+      if (!finalEmail) throw new Error('No email to search')
       client = $app.findFirstRecordByFilter('clients', 'email = {:email} && user_id = {:userId}', {
         email: finalEmail,
         userId,
@@ -70,7 +72,9 @@ routerAdd(
       client = new Record(clientsCol)
       client.set('nome', finalName)
       client.set('empresa', meetingData.company || 'Empresa Importada')
-      client.set('email', finalEmail)
+      if (finalEmail) {
+        client.set('email', finalEmail)
+      }
       client.set('estagio_id', firstStage.id)
       client.set('user_id', userId)
       $app.save(client)

@@ -26,7 +26,7 @@ routerAdd(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          token: token,
         },
         timeout: 10,
       })
@@ -47,7 +47,7 @@ routerAdd(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          token: token,
         },
         timeout: 10,
       })

@@ -18,16 +18,12 @@ routerAdd('POST', '/backend/v1/tldv-webhook', (e) => {
       return e.json(401, { error: 'Chave de API invalida' })
     }
 
-    let userId = e.auth?.id
+    const userId = e.auth?.id
     if (!userId) {
-      try {
-        const users = $app.findRecordsByFilter('users', 'id != ""', 'created', 1, 0)
-        if (users.length > 0) userId = users[0].id
-      } catch (_) {}
-    }
-
-    if (!userId) {
-      return e.badRequestError('Nenhum usuário encontrado para associar os dados.')
+      return e.json(401, {
+        error:
+          'Este webhook requer configuracao do usuario. Acesse Integracoes no hub e siga as instrucoes para vincular o webhook ao seu usuario.',
+      })
     }
 
     const tldvKey = $secrets.get('TLDV_API_KEY')

@@ -42,7 +42,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
+              token: token,
             },
             timeout: 10,
           })
@@ -77,7 +77,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
+                token: token,
               },
               timeout: 10,
             })

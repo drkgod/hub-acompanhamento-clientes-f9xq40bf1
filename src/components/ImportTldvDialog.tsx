@@ -58,26 +58,26 @@ export function ImportTldvDialog() {
           className="h-14 rounded-full px-6 shadow-xl bg-white hover:bg-slate-50 text-slate-800 flex items-center justify-center gap-2 group transition-all duration-300 hover:scale-105 border border-slate-200"
         >
           <Download className="h-5 w-5" />
-          <span className="font-medium text-base hidden sm:inline">Import from tl;dv</span>
+          <span className="font-medium text-base hidden sm:inline">Importar do tl;dv</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleImport}>
           <DialogHeader>
-            <DialogTitle>Import from tl;dv</DialogTitle>
+            <DialogTitle>Importar do tl;dv</DialogTitle>
             <DialogDescription>
-              Enter the client's email address associated with the tl;dv recording to import their
-              data.
+              Informe o email de um participante da gravacao no tl;dv para importar os dados da
+              reuniao automaticamente.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email address</Label>
+              <Label htmlFor="email">Endereco de email</Label>
               <Input
                 id="email"
                 type="email"
                 required
-                placeholder="client@example.com"
+                placeholder="Digite o email do participante da gravacao no tl;dv"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -87,7 +87,7 @@ export function ImportTldvDialog() {
           <DialogFooter>
             <Button type="submit" disabled={loading || !email}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Import Client
+              Importar Cliente
             </Button>
           </DialogFooter>
         </form>
