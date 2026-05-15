@@ -24,6 +24,16 @@ routerAdd(
     let meetingData = null
     let invitee = null
 
+    const tldvHeaders = {
+      'x-api-key': apiKey,
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      Accept: 'application/json',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      Origin: 'https://app.tldv.io',
+      Referer: 'https://app.tldv.io/',
+    }
+
     let page = 1
     const limit = 20
     const maxPages = 3
@@ -34,7 +44,7 @@ routerAdd(
         res = $http.send({
           url: `https://pasta.tldv.io/v1alpha1/meetings?limit=${limit}&page=${page}`,
           method: 'GET',
-          headers: { 'x-api-key': apiKey },
+          headers: tldvHeaders,
           timeout: 30,
         })
       } catch (err) {
@@ -45,13 +55,13 @@ routerAdd(
       if (
         res.statusCode !== 200 ||
         !res.json ||
-        !Array.isArray(res.json.meetings) ||
-        res.json.meetings.length === 0
+        !Array.isArray(res.json.results) ||
+        res.json.results.length === 0
       ) {
         break
       }
 
-      for (const listMeeting of res.json.meetings) {
+      for (const listMeeting of res.json.results) {
         if (!listMeeting.id) continue
 
         let detailRes
@@ -59,7 +69,7 @@ routerAdd(
           detailRes = $http.send({
             url: `https://pasta.tldv.io/v1alpha1/meetings/${listMeeting.id}`,
             method: 'GET',
-            headers: { 'x-api-key': apiKey },
+            headers: tldvHeaders,
             timeout: 30,
           })
         } catch (err) {
@@ -147,13 +157,23 @@ routerAdd(
         const trRes = $http.send({
           url: `https://pasta.tldv.io/v1alpha1/meetings/${meetingData.id}/transcript`,
           method: 'GET',
-          headers: { 'x-api-key': apiKey },
+          headers: tldvHeaders,
           timeout: 30,
         })
 
-        if (trRes.statusCode === 200 && trRes.json) {
-          if (Array.isArray(trRes.json.data) && trRes.json.data.length > 0) {
-            transcriptText = trRes.json.data.map((seg) => `${seg.speaker}: ${seg.text}`).join('\n')
+        if (trRes.statusCode === 204) {
+          transcriptText =
+            'Transcricao ainda sendo processada pelo tl;dv. Tente reimportar em alguns minutos.'
+        } else if (trRes.statusCode === 200 && trRes.json) {
+          if (Array.isArray(trRes.json.data)) {
+            if (trRes.json.data.length > 0) {
+              transcriptText = trRes.json.data
+                .map((seg) => `${seg.speaker}: ${seg.text}`)
+                .join('\n')
+            } else {
+              transcriptText =
+                'Transcricao ainda sendo processada pelo tl;dv. Tente reimportar em alguns minutos.'
+            }
           } else if (trRes.json.transcript) {
             transcriptText = trRes.json.transcript
           } else if (trRes.json.fullText) {
@@ -166,7 +186,8 @@ routerAdd(
     }
 
     if (!transcriptText) {
-      transcriptText = 'Transcrição pendente de processamento pelo agente.'
+      transcriptText =
+        'Transcricao ainda sendo processada pelo tl;dv. Tente reimportar em alguns minutos.'
     }
 
     const transcriptsCol = $app.findCollectionByNameOrId('transcripts')
