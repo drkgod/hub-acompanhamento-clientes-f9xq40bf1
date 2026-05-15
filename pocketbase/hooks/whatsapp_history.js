@@ -24,6 +24,13 @@ routerAdd(
           fromMe: r.getBool('from_me'),
           timestamp: r.getInt('timestamp'),
           type: r.getString('type'),
+          media_url: r.getString('media_url'),
+          media_mimetype: r.getString('media_mimetype'),
+          media_type: r.getString('media_type'),
+          media_filename: r.getString('media_filename'),
+          media_transcription: r.getString('media_transcription'),
+          media_caption: r.getString('media_caption'),
+          media_error: r.getString('media_error'),
         }))
         .reverse()
 
@@ -68,6 +75,13 @@ routerAdd(
           timestamp: r.getInt('timestamp'),
           type: r.getString('type'),
           created: r.getString('created'),
+          media_url: r.getString('media_url'),
+          media_mimetype: r.getString('media_mimetype'),
+          media_type: r.getString('media_type'),
+          media_filename: r.getString('media_filename'),
+          media_transcription: r.getString('media_transcription'),
+          media_caption: r.getString('media_caption'),
+          media_error: r.getString('media_error'),
         }))
         .reverse()
 

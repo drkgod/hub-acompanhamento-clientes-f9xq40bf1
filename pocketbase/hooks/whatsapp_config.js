@@ -199,6 +199,26 @@ routerAdd(
           }
         }
 
+        let ultima_mensagem_body = latest.getString('body')
+        const mediaType = latest.getString('media_type')
+        const mediaTrans = latest.getString('media_transcription')
+
+        if (['audio', 'myaudio', 'ptt'].includes(mediaType) && mediaTrans) {
+          ultima_mensagem_body = mediaTrans
+        } else if (!ultima_mensagem_body && mediaType) {
+          if (['image', 'sticker'].includes(mediaType)) {
+            ultima_mensagem_body = '[Imagem]'
+          } else if (['document'].includes(mediaType)) {
+            ultima_mensagem_body = '[Documento]'
+          } else if (['audio', 'myaudio', 'ptt'].includes(mediaType)) {
+            ultima_mensagem_body = '[Áudio]'
+          } else if (['video', 'ptv'].includes(mediaType)) {
+            ultima_mensagem_body = '[Vídeo]'
+          } else {
+            ultima_mensagem_body = '[Mídia]'
+          }
+        }
+
         conversations.push({
           chat_id: latest.getString('chat_id') || latest.getString('phone'),
           phone: latest.getString('phone'),
@@ -206,7 +226,7 @@ routerAdd(
           nome: client ? client.getString('nome') : latest.getString('phone'),
           telefone: client ? client.getString('telefone') : latest.getString('phone'),
           status_inatividade: client ? client.getString('status_inatividade') : 'sem_status',
-          ultima_mensagem_body: latest.getString('body'),
+          ultima_mensagem_body: ultima_mensagem_body,
           ultima_mensagem_timestamp: latest.getInt('timestamp'),
           ultima_mensagem_from_me: latest.getBool('from_me'),
           total_nao_respondidas: total_nao_respondidas,
