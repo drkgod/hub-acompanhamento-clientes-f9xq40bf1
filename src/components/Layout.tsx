@@ -1,5 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { Search, Plus, LayoutDashboard, LogOut, Newspaper, MessageSquare } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  LayoutDashboard,
+  LogOut,
+  Newspaper,
+  MessageSquare,
+  Settings,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -93,21 +101,33 @@ export default function Layout() {
                 Pipeline
               </Link>
               <Link
-                to="/inbox"
+                to="/whatsapp"
                 className={cn(
                   'relative px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2',
-                  location.pathname.startsWith('/inbox')
+                  location.pathname.startsWith('/whatsapp')
                     ? 'bg-slate-100 text-slate-900'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                 )}
               >
                 <MessageSquare className="h-4 w-4" />
-                Inbox
+                WhatsApp
                 {unreadBadgeCount > 0 && (
                   <span className="flex h-5 items-center justify-center rounded-full bg-red-500 px-2 text-[10px] font-bold text-white shadow-sm">
                     {unreadBadgeCount}
                   </span>
                 )}
+              </Link>
+              <Link
+                to="/integrations"
+                className={cn(
+                  'px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2',
+                  location.pathname.startsWith('/integrations')
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                Integrações
               </Link>
             </nav>
           </div>

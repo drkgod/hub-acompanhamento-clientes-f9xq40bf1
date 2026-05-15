@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import pb from '@/lib/pocketbase/client'
-import { Copy, Check, MessageSquare, Link as LinkIcon, Loader2 } from 'lucide-react'
+import { Copy, Check, MessageSquare, Link as LinkIcon, Loader2, Unplug } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,13 +16,32 @@ export default function Integrations() {
 
   const [waBaseUrl, setWaBaseUrl] = useState('')
   const [waApiToken, setWaApiToken] = useState('')
-  const [waInstanceName, setWaInstanceName] = useState('skip_instance')
   const [waStatus, setWaStatus] = useState<{
     connected: boolean
     status: string
     instance_name: string
+    webhook_configured?: boolean
+    base_url?: string
   } | null>(null)
   const [isWaLoading, setIsWaLoading] = useState(false)
+
+  const fetchWaInfo = async () => {
+    try {
+      const res = await pb.send<{
+        connected: boolean
+        status: string
+        instance_name: string
+        webhook_configured?: boolean
+        base_url?: string
+      }>('/backend/v1/whatsapp/status', { method: 'GET' })
+      setWaStatus(res)
+      if (res?.connected && res.base_url) {
+        setWaBaseUrl(res.base_url)
+      }
+    } catch (err) {
+      console.error('Failed to load whatsapp info', err)
+    }
+  }
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -38,14 +57,6 @@ export default function Integrations() {
         setIsLoading(false)
       }
     }
-    const fetchWaInfo = async () => {
-      try {
-        const res = await pb.send('/backend/v1/whatsapp/status', { method: 'GET' })
-        setWaStatus(res)
-      } catch (err) {
-        console.error('Failed to load whatsapp info', err)
-      }
-    }
     fetchInfo()
     fetchWaInfo()
   }, [])
@@ -58,16 +69,42 @@ export default function Integrations() {
         body: JSON.stringify({
           base_url: waBaseUrl,
           api_token: waApiToken,
-          instance_name: waInstanceName,
+          instance_name: 'skip_instance',
         }),
       })
-      toast({ title: 'Configurado com sucesso' })
-      const res = await pb.send('/backend/v1/whatsapp/status', { method: 'GET' })
-      setWaStatus(res)
+      toast({ title: 'Conectado com sucesso' })
+      setWaApiToken('')
+      await fetchWaInfo()
     } catch (err: any) {
       toast({
-        title: 'Erro ao configurar',
+        title: 'Erro ao conectar',
         description: err.message || 'Verifique suas credenciais',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsWaLoading(false)
+    }
+  }
+
+  const handleDisconnectWa = async () => {
+    try {
+      setIsWaLoading(true)
+      await pb.send('/backend/v1/whatsapp/configure', {
+        method: 'POST',
+        body: JSON.stringify({
+          base_url: '',
+          api_token: '',
+          instance_name: '',
+        }),
+      })
+      toast({ title: 'Desconectado com sucesso' })
+      setWaBaseUrl('')
+      setWaApiToken('')
+      await fetchWaInfo()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao desconectar',
+        description: err.message || 'Tente novamente',
         variant: 'destructive',
       })
     } finally {
@@ -114,46 +151,87 @@ export default function Integrations() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="bg-muted/50 p-4 rounded-lg text-sm">
+              <h3 className="font-medium mb-2">Instruções de Configuração</h3>
+              <ul className="list-disc list-inside space-y-1 text-slate-700">
+                <li>
+                  Acesse o <strong>Painel UAZAPI &gt; Instâncias &gt; Token</strong> para obter suas
+                  credenciais.
+                </li>
+                <li>
+                  Após a conexão, o webhook será configurado automaticamente em sua instância.
+                </li>
+              </ul>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">URL Base da API</label>
+                <label className="text-sm font-medium">URL Base da instância</label>
                 <Input
-                  placeholder="https://api.uazapi.com"
+                  placeholder="https://minhainstancia.uazapi.com"
                   value={waBaseUrl}
                   onChange={(e) => setWaBaseUrl(e.target.value)}
+                  disabled={waStatus?.connected}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Token da Instância</label>
+                <label className="text-sm font-medium">Token da instância</label>
                 <Input
                   type="password"
-                  placeholder="Seu token de acesso"
+                  placeholder={waStatus?.connected ? '••••••••••••••••' : 'Seu token de acesso'}
                   value={waApiToken}
                   onChange={(e) => setWaApiToken(e.target.value)}
+                  disabled={waStatus?.connected}
                 />
               </div>
             </div>
 
             <div className="flex items-center justify-between border-t pt-5">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-3 h-3 rounded-full ${waStatus?.connected ? 'bg-green-500' : 'bg-slate-300'}`}
-                />
-                <span className="text-sm font-medium text-slate-700">
-                  Status: {waStatus?.connected ? 'Conectado' : 'Desconectado'}
-                  {waStatus?.instance_name && waStatus.connected
-                    ? ` (${waStatus.instance_name})`
-                    : ''}
-                </span>
-              </div>
-              <Button onClick={handleSaveWa} disabled={isWaLoading || !waBaseUrl || !waApiToken}>
-                {isWaLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <LinkIcon className="w-4 h-4 mr-2" />
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      waStatus?.connected ? 'bg-green-500' : 'bg-red-500'
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    Status: {waStatus?.connected ? 'Conectado' : 'Desconectado'}
+                    {waStatus?.instance_name && waStatus.connected
+                      ? ` (${waStatus.instance_name})`
+                      : ''}
+                  </span>
+                </div>
+                {waStatus?.connected && (
+                  <span className="text-xs text-slate-500 ml-6">
+                    Webhook: {waStatus.webhook_configured ? 'Configurado' : 'Pendente'}
+                  </span>
                 )}
-                Conectar e Salvar
-              </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {waStatus?.connected ? (
+                  <Button variant="destructive" onClick={handleDisconnectWa} disabled={isWaLoading}>
+                    {isWaLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Unplug className="w-4 h-4 mr-2" />
+                    )}
+                    Desconectar
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSaveWa}
+                    disabled={isWaLoading || !waBaseUrl || !waApiToken}
+                  >
+                    {isWaLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                    )}
+                    Conectar
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

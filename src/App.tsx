@@ -38,9 +38,9 @@ const App = () => (
                 <Route path="/pipeline" element={<Index />} />
                 <Route path="/clientes/:id" element={<ClientDetailsPage />} />
                 <Route path="/clientes/:id/whatsapp" element={<ClientWhatsAppPage />} />
-                <Route path="/inbox" element={<WhatsAppInbox />} />
+                <Route path="/whatsapp" element={<WhatsAppInbox />} />
                 <Route path="/nova-reuniao" element={<NewMeeting />} />
-                <Route path="/integracoes" element={<Integrations />} />
+                <Route path="/integrations" element={<Integrations />} />
                 <Route path="/digest" element={<Digest />} />
               </Route>
             </Route>
