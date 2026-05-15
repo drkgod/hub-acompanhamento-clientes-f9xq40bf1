@@ -22,7 +22,7 @@ routerAdd(
       if (cleanPhone.length === 10 || cleanPhone.length === 11) cleanPhone = '55' + cleanPhone
 
       const res1 = $http.send({
-        url: `${baseUrl}/chat/findByPhone/${cleanPhone}`,
+        url: `${baseUrl}/chats/phone/${cleanPhone}`,
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ routerAdd(
       }
 
       const res2 = $http.send({
-        url: `${baseUrl}/chat/messages/${chatId}?limit=50&page=1`,
+        url: `${baseUrl}/chats/${chatId}/messages?limit=50&page=1`,
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +54,12 @@ routerAdd(
 
       if (res2.statusCode === 200 && res2.json) {
         const msgs = res2.json.messages || res2.json.data || res2.json
-        return e.json(200, { messages: Array.isArray(msgs) ? msgs : [] })
+        let messagesArray = Array.isArray(msgs) ? msgs : []
+        messagesArray = messagesArray.map((msg) => ({
+          ...msg,
+          text: msg.body !== undefined ? msg.body : msg.text,
+        }))
+        return e.json(200, { messages: messagesArray })
       }
 
       return e.json(200, { messages: [] })

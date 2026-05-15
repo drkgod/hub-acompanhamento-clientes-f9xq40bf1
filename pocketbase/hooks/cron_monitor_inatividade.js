@@ -38,7 +38,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
       while (retries < 3 && !success) {
         try {
           const res1 = $http.send({
-            url: `${baseUrl}/chat/findByPhone/${cleanPhone}`,
+            url: `${baseUrl}/chats/phone/${cleanPhone}`,
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -63,6 +63,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
             const data = res1.json.data || res1.json
             if (data && data.lastMessage && data.lastMessage.timestamp) {
               const ts = data.lastMessage.timestamp
+              const lastMessageBody = data.lastMessage.body || ''
               dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
             } else if (data && data.id) {
               chatId = data.id
@@ -73,7 +74,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
 
           if (!dateToUse && chatId) {
             const res2 = $http.send({
-              url: `${baseUrl}/chat/messages/${chatId}?limit=50&page=1`,
+              url: `${baseUrl}/chats/${chatId}/messages?limit=50&page=1`,
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
@@ -86,6 +87,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
               const msgs = res2.json.messages || res2.json.data || res2.json
               if (Array.isArray(msgs) && msgs.length > 0 && msgs[0].timestamp) {
                 const ts = msgs[0].timestamp
+                const msgBody = msgs[0].body || ''
                 dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
               }
             }
