@@ -1,6 +1,6 @@
 routerAdd(
   'GET',
-  '/backend/v1/whatsapp/conversations',
+  '/backend/v1/whatsapp/inbox-conversations',
   (e) => {
     function normalizePhone(p) {
       if (!p) return ''
