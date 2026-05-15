@@ -453,7 +453,7 @@ export default function WhatsAppInbox() {
                     className="text-slate-700 bg-white shadow-sm flex items-center gap-2"
                   >
                     <Link2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Vincular</span>
+                    <span className="hidden sm:inline">Vincular cliente</span>
                   </Button>
                 )}
               </div>
