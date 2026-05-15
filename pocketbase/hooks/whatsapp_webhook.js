@@ -11,15 +11,36 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
     const expectedToken = $secrets.get('UAZAPI_WEBHOOK_SECRET')
     const headers = e.requestInfo().headers || {}
     const query = e.requestInfo().query || {}
-    const providedToken = headers['token'] || headers['x-api-key']
+    const providedToken = headers['token'] || headers['x-api-key'] || headers['authorization']
     const providedSecret = query['secret']
 
-    if (expectedToken && providedToken !== expectedToken && providedSecret !== expectedToken) {
+    const body = e.requestInfo().body || {}
+    const instanceName = body.instance || ''
+
+    if (!instanceName) {
+      return e.json(200, { ok: true, ignored: true, reason: 'instance_not_found' })
+    }
+
+    let instance = null
+    try {
+      instance = $app.findFirstRecordByData('whatsapp_instances', 'instance_name', instanceName)
+    } catch (_) {
+      return e.json(200, { ok: true, ignored: true, reason: 'instance_not_found' })
+    }
+
+    const instanceToken = instance.getString('api_token')
+
+    const isSecretValid = expectedToken && providedSecret === expectedToken
+    const isTokenValid =
+      instanceToken &&
+      (providedToken === instanceToken || providedToken === `Bearer ${instanceToken}`)
+
+    if (!isSecretValid && !isTokenValid) {
       return e.unauthorizedError('Invalid webhook token')
     }
 
-    const body = e.requestInfo().body || {}
     const event = body.event
+    const userId = instance.getString('user_id')
 
     if (
       event === 'messages' ||
@@ -35,8 +56,6 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
       } else if (body.data) {
         messages = [body.data]
       }
-
-      const instanceName = body.instance || ''
 
       for (const msg of messages) {
         let phone = ''
@@ -79,20 +98,6 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
 
         if (!messageId || !phone) continue
 
-        let userId = null
-        try {
-          const instance = $app.findFirstRecordByData(
-            'whatsapp_instances',
-            'instance_name',
-            instanceName,
-          )
-          userId = instance.getString('user_id')
-        } catch (_) {}
-
-        if (!userId) {
-          return e.json(200, { ok: true, ignored: true, reason: 'instance_not_found' })
-        }
-
         let clientId = ''
         const normPhone = normalizePhone(phone)
         try {
@@ -130,18 +135,10 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
         }
       }
     } else if (event === 'connection.update' || event === 'connection') {
-      const instanceName = body.instance
       const state = body.data?.state || body.state
-      if (instanceName && state) {
-        try {
-          const instance = $app.findFirstRecordByData(
-            'whatsapp_instances',
-            'instance_name',
-            instanceName,
-          )
-          instance.set('connection_status', state)
-          $app.save(instance)
-        } catch (_) {}
+      if (state) {
+        instance.set('connection_status', state)
+        $app.save(instance)
       }
     }
 
