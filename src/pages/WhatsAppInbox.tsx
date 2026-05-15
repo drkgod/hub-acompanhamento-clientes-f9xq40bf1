@@ -16,6 +16,8 @@ import {
   Loader2,
   Link2,
   Sparkles,
+  FileText,
+  Download,
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -57,6 +59,13 @@ interface Message {
   from_me: boolean
   timestamp: number
   created: string
+  media_url?: string
+  media_mimetype?: string
+  media_type?: string
+  media_filename?: string
+  media_transcription?: string
+  media_caption?: string
+  media_error?: string
 }
 
 export default function WhatsAppInbox() {
@@ -468,35 +477,124 @@ export default function WhatsAppInbox() {
                     </span>
                   </div>
 
-                  {group.messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={cn('flex w-full', m.from_me ? 'justify-end' : 'justify-start')}
-                    >
+                  {group.messages.map((m) => {
+                    const hasMedia = !!m.media_url || !!m.media_error
+                    const content = m.body || ''
+                    const caption = m.media_caption || content
+                    const isPlaceholder = [
+                      '[Imagem]',
+                      '[Sticker]',
+                      '[Vídeo]',
+                      '[Áudio]',
+                      '[Documento]',
+                      '🎵 Áudio',
+                      '📷 Imagem',
+                      '🎥 Vídeo',
+                      '📄 Documento',
+                    ].includes(caption.trim())
+                    const showText = !hasMedia || (caption && !isPlaceholder)
+
+                    return (
                       <div
-                        className={cn(
-                          'max-w-[75%] sm:max-w-[60%] px-4 py-2.5 shadow-sm text-[15px] relative',
-                          m.from_me
-                            ? 'bg-[#d9fdd3] text-slate-800 rounded-[18px] rounded-tr-[4px] border border-[#c3ebbc]'
-                            : 'bg-white text-slate-800 rounded-[18px] rounded-tl-[4px] border border-white',
-                        )}
+                        key={m.id}
+                        className={cn('flex w-full', m.from_me ? 'justify-end' : 'justify-start')}
                       >
-                        <p className="whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
-                        <span
+                        <div
                           className={cn(
-                            'text-[10px] float-right mt-2 ml-3 font-medium text-slate-400',
+                            'max-w-[75%] sm:max-w-[60%] px-4 py-2.5 shadow-sm text-[15px] relative',
+                            m.from_me
+                              ? 'bg-[#d9fdd3] text-slate-800 rounded-[18px] rounded-tr-[4px] border border-[#c3ebbc]'
+                              : 'bg-white text-slate-800 rounded-[18px] rounded-tl-[4px] border border-white',
                           )}
                         >
-                          {format(
-                            new Date(
-                              m.timestamp < 1000000000000 ? m.timestamp * 1000 : m.timestamp,
-                            ),
-                            'HH:mm',
+                          {hasMedia && (
+                            <div className="mb-1.5">
+                              {m.media_error ? (
+                                <div className="p-2 bg-black/5 rounded text-slate-500 text-[11px] italic">
+                                  Mídia não disponível para download
+                                </div>
+                              ) : m.media_type === 'image' || m.media_type === 'sticker' ? (
+                                <img
+                                  src={m.media_url}
+                                  alt={m.media_filename || 'Imagem'}
+                                  className="max-w-full rounded-lg max-h-[300px] object-contain"
+                                />
+                              ) : m.media_type === 'video' || m.media_type === 'ptv' ? (
+                                <video
+                                  src={m.media_url}
+                                  controls
+                                  className="max-w-full rounded-lg max-h-[300px]"
+                                />
+                              ) : m.media_type === 'audio' ||
+                                m.media_type === 'myaudio' ||
+                                m.media_type === 'ptt' ? (
+                                <div className="min-w-[200px]">
+                                  <audio src={m.media_url} controls className="w-full h-10" />
+                                  {m.media_transcription && (
+                                    <div className="text-[11px] bg-black/5 p-2 rounded mt-1.5 italic opacity-80">
+                                      <span className="font-semibold not-italic">Transcrição:</span>{' '}
+                                      {m.media_transcription}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : m.media_type === 'document' ? (
+                                <div className="flex items-center gap-3 p-3 bg-black/5 rounded-lg min-w-[200px]">
+                                  <div className="bg-red-500/10 text-red-600 p-2 rounded shrink-0">
+                                    <FileText className="w-5 h-5" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {m.media_filename || 'Documento'}
+                                    </p>
+                                    <p className="text-[10px] opacity-70 truncate">
+                                      {m.media_mimetype}
+                                    </p>
+                                  </div>
+                                  <a
+                                    href={m.media_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="shrink-0 p-2 hover:bg-black/10 rounded-full transition-colors"
+                                    title="Abrir documento"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </a>
+                                </div>
+                              ) : (
+                                <a
+                                  href={m.media_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline text-sm flex items-center gap-2 break-all p-2 bg-black/5 rounded"
+                                >
+                                  <Download className="w-4 h-4 shrink-0" />
+                                  {m.media_filename || 'Baixar mídia'}
+                                </a>
+                              )}
+                            </div>
                           )}
-                        </span>
+
+                          {showText && (
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">
+                              {hasMedia ? caption : content}
+                            </p>
+                          )}
+                          <span
+                            className={cn(
+                              'text-[10px] float-right mt-2 ml-3 font-medium text-slate-400',
+                            )}
+                          >
+                            {format(
+                              new Date(
+                                m.timestamp < 1000000000000 ? m.timestamp * 1000 : m.timestamp,
+                              ),
+                              'HH:mm',
+                            )}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ))}
             </div>

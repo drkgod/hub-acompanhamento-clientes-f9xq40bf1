@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ClientHeader } from '@/components/client/ClientHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { RefreshCcw, MessageSquareOff, Check, CheckCheck } from 'lucide-react'
+import { RefreshCcw, MessageSquareOff, Check, CheckCheck, FileText, Download } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { Client } from '@/types'
 import { getClientDetails } from '@/services/client-details'
@@ -16,6 +16,13 @@ interface WhatsAppMessage {
   fromMe: boolean
   timestamp: number
   status?: string
+  media_url?: string
+  media_mimetype?: string
+  media_type?: string
+  media_filename?: string
+  media_transcription?: string
+  media_caption?: string
+  media_error?: string
 }
 
 export default function ClientWhatsAppPage() {
@@ -146,7 +153,22 @@ export default function ClientWhatsAppPage() {
                   typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts || Date.now(),
                 )
                 const isSent = msg.fromMe
+
+                const hasMedia = !!msg.media_url || !!msg.media_error
                 const content = msg.body || msg.text || ''
+                const caption = msg.media_caption || content
+                const isPlaceholder = [
+                  '[Imagem]',
+                  '[Sticker]',
+                  '[Vídeo]',
+                  '[Áudio]',
+                  '[Documento]',
+                  '🎵 Áudio',
+                  '📷 Imagem',
+                  '🎥 Vídeo',
+                  '📄 Documento',
+                ].includes(caption.trim())
+                const showText = !hasMedia || (caption && !isPlaceholder)
 
                 return (
                   <div
@@ -158,7 +180,78 @@ export default function ClientWhatsAppPage() {
                         : 'bg-white text-slate-800 self-start rounded-tl-sm border border-white',
                     )}
                   >
-                    <div className="whitespace-pre-wrap break-words">{content}</div>
+                    {hasMedia && (
+                      <div className="mb-1.5">
+                        {msg.media_error ? (
+                          <div className="p-2 bg-black/5 rounded text-slate-500 text-[11px] italic">
+                            Mídia não disponível para download
+                          </div>
+                        ) : msg.media_type === 'image' || msg.media_type === 'sticker' ? (
+                          <img
+                            src={msg.media_url}
+                            alt={msg.media_filename || 'Imagem'}
+                            className="max-w-full rounded-lg max-h-[300px] object-contain"
+                          />
+                        ) : msg.media_type === 'video' || msg.media_type === 'ptv' ? (
+                          <video
+                            src={msg.media_url}
+                            controls
+                            className="max-w-full rounded-lg max-h-[300px]"
+                          />
+                        ) : msg.media_type === 'audio' ||
+                          msg.media_type === 'myaudio' ||
+                          msg.media_type === 'ptt' ? (
+                          <div className="min-w-[200px]">
+                            <audio src={msg.media_url} controls className="w-full h-10" />
+                            {msg.media_transcription && (
+                              <div className="text-[11px] bg-black/5 p-2 rounded mt-1.5 italic opacity-80">
+                                <span className="font-semibold not-italic">Transcrição:</span>{' '}
+                                {msg.media_transcription}
+                              </div>
+                            )}
+                          </div>
+                        ) : msg.media_type === 'document' ? (
+                          <div className="flex items-center gap-3 p-3 bg-black/5 rounded-lg min-w-[200px]">
+                            <div className="bg-red-500/10 text-red-600 p-2 rounded shrink-0">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {msg.media_filename || 'Documento'}
+                              </p>
+                              <p className="text-[10px] opacity-70 truncate">
+                                {msg.media_mimetype}
+                              </p>
+                            </div>
+                            <a
+                              href={msg.media_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 p-2 hover:bg-black/10 rounded-full transition-colors"
+                              title="Abrir documento"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
+                        ) : (
+                          <a
+                            href={msg.media_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-sm flex items-center gap-2 break-all p-2 bg-black/5 rounded"
+                          >
+                            <Download className="w-4 h-4 shrink-0" />
+                            {msg.media_filename || 'Baixar mídia'}
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {showText && (
+                      <div className="whitespace-pre-wrap break-words">
+                        {hasMedia ? caption : content}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-end gap-1 mt-1">
                       <span className="text-[11px] text-slate-500/80 font-medium">
