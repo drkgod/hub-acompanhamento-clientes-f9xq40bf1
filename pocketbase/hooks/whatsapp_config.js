@@ -119,66 +119,109 @@ routerAdd(
       const userId = e.auth?.id
       if (!userId) return e.unauthorizedError('Auth required')
 
-      let result = []
-      try {
-        result = $app
-          .db()
-          .newQuery(`
-        SELECT 
-          m.chat_id,
-          m.phone,
-          c.id as client_id,
-          c.nome,
-          c.telefone,
-          c.status_inatividade,
-          m.body as ultima_mensagem_body,
-          m.timestamp as ultima_mensagem_timestamp,
-          m.from_me as ultima_mensagem_from_me,
-          (SELECT COUNT(*) FROM whatsapp_messages m2 
-            WHERE COALESCE(NULLIF(m2.chat_id, ''), m2.phone) = COALESCE(NULLIF(m.chat_id, ''), m.phone)
-            AND m2.from_me = 0 
-            AND m2.timestamp > (
-              SELECT COALESCE(MAX(m3.timestamp), 0) FROM whatsapp_messages m3 
-              WHERE COALESCE(NULLIF(m3.chat_id, ''), m3.phone) = COALESCE(NULLIF(m.chat_id, ''), m.phone)
-              AND m3.from_me = 1
-            )
-          ) as total_nao_respondidas
-        FROM whatsapp_messages m
-        LEFT JOIN clients c ON m.client_id = c.id
-        WHERE m.user_id = {:userId}
-        AND m.id IN (
-          SELECT id FROM (
-            SELECT id, MAX(timestamp) FROM whatsapp_messages
-            WHERE user_id = {:userId}
-            GROUP BY COALESCE(NULLIF(chat_id, ''), phone)
-          )
-        )
-        ORDER BY m.timestamp DESC
-      `)
-          .bind({ userId: userId })
-          .all()
-      } catch (err) {
-        $app.logger().error('Query Error', err.message)
+      const messages = $app.findRecordsByFilter(
+        'whatsapp_messages',
+        'user_id = {:userId}',
+        '-timestamp',
+        5000,
+        0,
+        { userId },
+      )
+
+      $app.logger().info('whatsapp_conversations fetch', 'totalMessages', messages.length)
+
+      const clients = $app.findRecordsByFilter('clients', 'user_id = {:userId}', '', 5000, 0, {
+        userId,
+      })
+
+      function normalizePhone(val) {
+        if (!val) return ''
+        let digits = String(val).replace(/\D/g, '')
+        digits = digits.replace(/^0+/, '')
+        if (digits.length === 10 || digits.length === 11) {
+          digits = '55' + digits
+        }
+        return digits
       }
 
-      const conversations = result.map((r) => ({
-        chat_id: r.chat_id || r.phone,
-        phone: r.phone,
-        client_id: r.client_id,
-        nome: r.nome || r.phone,
-        telefone: r.telefone || r.phone,
-        status_inatividade: r.status_inatividade || 'sem_status',
-        ultima_mensagem_body: r.ultima_mensagem_body,
-        ultima_mensagem_timestamp: Number(r.ultima_mensagem_timestamp),
-        ultima_mensagem_from_me:
-          r.ultima_mensagem_from_me === 1 ||
-          r.ultima_mensagem_from_me === true ||
-          r.ultima_mensagem_from_me === 'true',
-        total_nao_respondidas: Number(r.total_nao_respondidas) || 0,
-      }))
+      const clientMapById = {}
+      const clientMapByPhone = {}
+      for (const c of clients) {
+        clientMapById[c.id] = c
+        const phone = normalizePhone(c.getString('telefone'))
+        if (phone) {
+          clientMapByPhone[phone] = c
+        }
+      }
+
+      const groups = {}
+      for (const m of messages) {
+        const chatId = m.getString('chat_id')
+        const phone = m.getString('phone')
+        const key = chatId || phone
+        if (!key) continue
+
+        if (!groups[key]) groups[key] = []
+        groups[key].push(m)
+      }
+
+      const groupKeys = Object.keys(groups)
+      $app.logger().info('whatsapp_conversations groups', 'totalGroups', groupKeys.length)
+
+      const conversations = []
+
+      for (const key of groupKeys) {
+        const msgs = groups[key]
+        const latest = msgs[0]
+
+        let client = null
+        const msgClientId = latest.getString('client_id')
+        if (msgClientId && clientMapById[msgClientId]) {
+          client = clientMapById[msgClientId]
+        } else {
+          const msgPhone = normalizePhone(latest.getString('phone'))
+          if (msgPhone && clientMapByPhone[msgPhone]) {
+            client = clientMapByPhone[msgPhone]
+          }
+        }
+
+        let lastSentTimestamp = 0
+        for (const m of msgs) {
+          if (m.getBool('from_me') && m.getInt('timestamp') > lastSentTimestamp) {
+            lastSentTimestamp = m.getInt('timestamp')
+          }
+        }
+
+        let total_nao_respondidas = 0
+        for (const m of msgs) {
+          if (!m.getBool('from_me') && m.getInt('timestamp') > lastSentTimestamp) {
+            total_nao_respondidas++
+          }
+        }
+
+        conversations.push({
+          chat_id: latest.getString('chat_id') || latest.getString('phone'),
+          phone: latest.getString('phone'),
+          client_id: client ? client.id : '',
+          nome: client ? client.getString('nome') : latest.getString('phone'),
+          telefone: client ? client.getString('telefone') : latest.getString('phone'),
+          status_inatividade: client ? client.getString('status_inatividade') : 'sem_status',
+          ultima_mensagem_body: latest.getString('body'),
+          ultima_mensagem_timestamp: latest.getInt('timestamp'),
+          ultima_mensagem_from_me: latest.getBool('from_me'),
+          total_nao_respondidas: total_nao_respondidas,
+        })
+      }
+
+      conversations.sort((a, b) => b.ultima_mensagem_timestamp - a.ultima_mensagem_timestamp)
+
+      $app
+        .logger()
+        .info('whatsapp_conversations returned', 'totalConversations', conversations.length)
 
       return e.json(200, { conversations })
     } catch (err) {
+      $app.logger().error('whatsapp_conversations error', 'message', err.message)
       return e.badRequestError(err.message)
     }
   },
