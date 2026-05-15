@@ -47,6 +47,14 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
     return ''
   }
 
+  function extractFilename(msg) {
+    if (!msg) return ''
+    if (msg.fileName) return msg.fileName
+    if (msg.message && msg.message.documentMessage && msg.message.documentMessage.fileName)
+      return msg.message.documentMessage.fileName
+    return ''
+  }
+
   function downloadMediaIfNeeded(baseUrl, token, messageId, messageType) {
     try {
       const isAudio = messageType === 'audio' || messageType === 'myaudio' || messageType === 'ptt'
@@ -54,7 +62,7 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
         id: messageId,
         return_link: true,
         return_base64: false,
-        generate_mp3: true,
+        generate_mp3: isAudio,
         download_quoted: false,
         transcribe: isAudio,
       }
@@ -66,7 +74,7 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
           token: token,
         },
         body: JSON.stringify(body),
-        timeout: 30,
+        timeout: 45,
       })
       if (res.statusCode !== 200) {
         return { media_error: 'API returned status ' + res.statusCode }
@@ -139,13 +147,12 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
         let messageId = ''
         let fromMe = false
         let timestamp = 0
-        let msgBody = ''
         let msgType = ''
 
         if (msg.key) {
           chatId = msg.key.remoteJid || msg.key.chatId || msg.chatId || ''
           phone = chatId.split('@')[0] || ''
-          messageId = msg.key.id || msg.messageId || ''
+          messageId = msg.key.id || msg.messageId || msg.id || ''
           fromMe = msg.key.fromMe || false
           timestamp = msg.messageTimestamp || msg.timestamp || 0
         } else {
@@ -162,14 +169,19 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
           Object.keys(actualMessage || {}).find((k) => k !== 'messageContextInfo') ||
           'text'
 
+        if (msgType.endsWith('Message') && msgType !== 'extendedTextMessage') {
+          msgType = msgType.replace('Message', '')
+        }
+
         let extractedText = extractMessageText(msg)
-        msgBody = extractedText || `[${msgType}]`
+        let extractedFilename = extractFilename(msg)
 
         let mediaUrl = ''
         let mediaMimetype = ''
         let mediaTranscription = ''
         let mediaError = ''
         let mediaType = ''
+        let mediaDownloadedAt = null
 
         if (isMediaMessage(msg, msgType)) {
           mediaType = msgType
@@ -184,9 +196,31 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
             mediaUrl = mediaData.fileURL
             mediaMimetype = mediaData.mimetype || ''
             mediaTranscription = mediaData.transcription || ''
+            mediaDownloadedAt = new Date().toISOString()
           } else if (mediaData.media_error) {
             mediaError = mediaData.media_error
           }
+        }
+
+        let msgBody = extractedText || ''
+
+        if (mediaType) {
+          if (mediaType === 'image') {
+            msgBody = extractedText || '[Imagem]'
+          } else if (mediaType === 'document') {
+            msgBody = extractedFilename ? `[Documento: ${extractedFilename}]` : '[Documento]'
+            if (extractedText) msgBody += `\n${extractedText}`
+          } else if (mediaType === 'audio' || mediaType === 'myaudio' || mediaType === 'ptt') {
+            msgBody = mediaTranscription || '[Áudio]'
+          } else if (mediaType === 'video') {
+            msgBody = extractedText || '[Vídeo]'
+          } else if (mediaType === 'sticker') {
+            msgBody = '[Sticker]'
+          } else {
+            msgBody = extractedText || `[${mediaType}]`
+          }
+        } else if (!msgBody) {
+          msgBody = `[${msgType}]`
         }
 
         if (!messageId || !phone) continue
@@ -230,6 +264,9 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
           if (mediaTranscription) record.set('media_transcription', mediaTranscription)
           if (mediaError) record.set('media_error', mediaError)
           if (mediaType) record.set('media_type', mediaType)
+          if (extractedFilename) record.set('media_filename', extractedFilename)
+          if (extractedText) record.set('media_caption', extractedText)
+          if (mediaDownloadedAt) record.set('media_downloaded_at', mediaDownloadedAt)
 
           $app.save(record)
         }

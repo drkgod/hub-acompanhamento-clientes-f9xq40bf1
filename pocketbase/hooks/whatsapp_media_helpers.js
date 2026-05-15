@@ -1,8 +1,3 @@
-// This module provides helper functions for WhatsApp media processing.
-// Skip Cloud hooks execute in isolated VMs. If you need these helpers inside routerAdd or onRecord callbacks,
-// you must duplicate them inline in those files as per the VM isolation rules,
-// or export them as a module if your bundler or environment is configured to support require('./local').
-
 if (typeof module !== 'undefined') {
   module.exports = {
     isMediaMessage: function (msg, messageType) {
@@ -49,6 +44,14 @@ if (typeof module !== 'undefined') {
       return ''
     },
 
+    extractFilename: function (msg) {
+      if (!msg) return ''
+      if (msg.fileName) return msg.fileName
+      if (msg.message && msg.message.documentMessage && msg.message.documentMessage.fileName)
+        return msg.message.documentMessage.fileName
+      return ''
+    },
+
     downloadMediaIfNeeded: function (baseUrl, token, messageId, messageType) {
       try {
         const isAudio =
@@ -58,7 +61,7 @@ if (typeof module !== 'undefined') {
           id: messageId,
           return_link: true,
           return_base64: false,
-          generate_mp3: true,
+          generate_mp3: isAudio,
           download_quoted: false,
           transcribe: isAudio,
         }
@@ -71,7 +74,7 @@ if (typeof module !== 'undefined') {
             token: token,
           },
           body: JSON.stringify(body),
-          timeout: 30,
+          timeout: 45,
         })
 
         if (res.statusCode !== 200) {
