@@ -17,6 +17,7 @@ import ClientWhatsAppPage from './pages/ClientWhatsApp'
 import NewMeeting from './pages/NewMeeting'
 import Integrations from './pages/Integrations'
 import Digest from './pages/Digest'
+import WhatsAppInbox from './pages/WhatsAppInbox'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -37,6 +38,7 @@ const App = () => (
                 <Route path="/pipeline" element={<Index />} />
                 <Route path="/clientes/:id" element={<ClientDetailsPage />} />
                 <Route path="/clientes/:id/whatsapp" element={<ClientWhatsAppPage />} />
+                <Route path="/inbox" element={<WhatsAppInbox />} />
                 <Route path="/nova-reuniao" element={<NewMeeting />} />
                 <Route path="/integracoes" element={<Integrations />} />
                 <Route path="/digest" element={<Digest />} />

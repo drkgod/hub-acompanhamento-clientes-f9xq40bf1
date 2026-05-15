@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { Search, Plus, LayoutDashboard, LogOut, Newspaper } from 'lucide-react'
+import { Search, Plus, LayoutDashboard, LogOut, Newspaper, MessageSquare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,8 @@ import { useDebounce } from '@/hooks/use-debounce'
 import useMainStore from '@/stores/useMainStore'
 import { useAuth } from '@/hooks/use-auth'
 import { NotificationsPanel } from './NotificationsPanel'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Layout() {
   const [search, setSearch] = useState('')
@@ -24,9 +26,35 @@ export default function Layout() {
   const { user, signOut } = useAuth()
   const location = useLocation()
 
+  const [unreadBadgeCount, setUnreadBadgeCount] = useState(0)
+
   useEffect(() => {
     setSearchQuery(debouncedSearch)
   }, [debouncedSearch, setSearchQuery])
+
+  const fetchConversations = async () => {
+    try {
+      const res = await pb.send<{ conversations: any[] }>('/backend/v1/whatsapp/conversations', {
+        method: 'GET',
+      })
+      const count = res.conversations.filter(
+        (c) =>
+          (c.status_inatividade === 'vermelho' || c.status_inatividade === 'critico') &&
+          !c.ultima_mensagem_from_me,
+      ).length
+      setUnreadBadgeCount(count)
+    } catch {
+      /* intentionally ignored */
+    }
+  }
+
+  useEffect(() => {
+    if (user) fetchConversations()
+  }, [user])
+
+  useRealtime('whatsapp_messages', () => {
+    if (user) fetchConversations()
+  })
 
   return (
     <main className="flex flex-col h-screen max-h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
@@ -63,6 +91,23 @@ export default function Layout() {
                 )}
               >
                 Pipeline
+              </Link>
+              <Link
+                to="/inbox"
+                className={cn(
+                  'relative px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2',
+                  location.pathname.startsWith('/inbox')
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                )}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Inbox
+                {unreadBadgeCount > 0 && (
+                  <span className="flex h-5 items-center justify-center rounded-full bg-red-500 px-2 text-[10px] font-bold text-white shadow-sm">
+                    {unreadBadgeCount}
+                  </span>
+                )}
               </Link>
             </nav>
           </div>

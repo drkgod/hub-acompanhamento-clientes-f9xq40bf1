@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-15T16:44:58.727Z",
+  "generatedAt": "2026-05-15T17:04:05.634Z",
   "collections": [
     {
       "name": "users",
@@ -769,6 +769,153 @@
         }
       ],
       "indexes": []
+    },
+    {
+      "name": "whatsapp_instances",
+      "type": "base",
+      "apiRules": {
+        "list": "user_id = @request.auth.id",
+        "view": "user_id = @request.auth.id",
+        "create": "user_id = @request.auth.id",
+        "update": "user_id = @request.auth.id",
+        "delete": "user_id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "instance_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "base_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "api_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "webhook_configured",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_whatsapp_instances_user ON whatsapp_instances (user_id)"]
+    },
+    {
+      "name": "whatsapp_messages",
+      "type": "base",
+      "apiRules": {
+        "list": "user_id = @request.auth.id",
+        "view": "user_id = @request.auth.id",
+        "create": "user_id = @request.auth.id",
+        "update": "user_id = @request.auth.id",
+        "delete": "user_id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "from_me",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "message_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_whatsapp_messages_id ON whatsapp_messages (message_id)",
+        "CREATE INDEX idx_whatsapp_messages_client ON whatsapp_messages (client_id)",
+        "CREATE INDEX idx_whatsapp_messages_timestamp ON whatsapp_messages (timestamp DESC)"
+      ]
     }
   ]
 }

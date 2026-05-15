@@ -1,119 +1,23 @@
 cronAdd('monitor_inatividade', '0 0 * * *', () => {
-  const token = $secrets.get('UAZAPI_TOKEN')
-  let baseUrl = $secrets.get('UAZAPI_BASE_URL')
-
-  if (!token || !baseUrl) {
-    $app
-      .logger()
-      .error(
-        'As chaves UAZAPI_TOKEN e UAZAPI_BASE_URL precisam ser configuradas no Secrets do Skip antes de usar o monitor de inatividade.',
-      )
-    return
-  }
-
-  if (baseUrl.endsWith('/')) {
-    baseUrl = baseUrl.slice(0, -1)
-  }
-
   const clients = $app.findRecordsByFilter('clients', '1=1', '', 0, 0)
   const now = new Date()
 
   for (const client of clients) {
     let dateToUse = null
-    const telefone = client.getString('telefone')
 
-    if (telefone) {
-      let cleanPhone = telefone.replace(/\D/g, '')
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = cleanPhone.substring(1)
+    try {
+      const msgs = $app.findRecordsByFilter(
+        'whatsapp_messages',
+        `client_id = '${client.id}'`,
+        '-timestamp',
+        1,
+        0,
+      )
+      if (msgs.length > 0) {
+        const ts = msgs[0].getInt('timestamp')
+        dateToUse = new Date(ts < 1000000000000 ? ts * 1000 : ts)
       }
-      if (cleanPhone.length === 10 || cleanPhone.length === 11) {
-        cleanPhone = '55' + cleanPhone
-      }
-
-      let retries = 0
-      let success = false
-      let backoff = 2000
-
-      while (retries < 3 && !success) {
-        try {
-          const res1 = $http.send({
-            url: `${baseUrl}/chats/phone/${cleanPhone}`,
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              token: token,
-            },
-            timeout: 10,
-          })
-
-          if (res1.statusCode === 401 || res1.statusCode === 403) {
-            $app
-              .logger()
-              .error('Token da UAZAPI inválido ou sem permissão', 'status', res1.statusCode)
-            break
-          }
-
-          if (res1.statusCode >= 500) {
-            throw new Error(`UAZAPI 5xx error: ${res1.statusCode}`)
-          }
-
-          let chatId = null
-          if (res1.statusCode === 200 && res1.json) {
-            const data = res1.json.data || res1.json
-            if (data && data.lastMessage && data.lastMessage.timestamp) {
-              const ts = data.lastMessage.timestamp
-              const lastMessageBody = data.lastMessage.body || ''
-              dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
-            } else if (data && data.id) {
-              chatId = data.id
-            } else if (data && data.chatId) {
-              chatId = data.chatId
-            }
-          }
-
-          if (!dateToUse && chatId) {
-            const res2 = $http.send({
-              url: `${baseUrl}/chats/${chatId}/messages?limit=50&page=1`,
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                token: token,
-              },
-              timeout: 10,
-            })
-
-            if (res2.statusCode === 200 && res2.json) {
-              const msgs = res2.json.messages || res2.json.data || res2.json
-              if (Array.isArray(msgs) && msgs.length > 0 && msgs[0].timestamp) {
-                const ts = msgs[0].timestamp
-                const msgBody = msgs[0].body || ''
-                dateToUse = new Date(typeof ts === 'number' && ts < 1000000000000 ? ts * 1000 : ts)
-              }
-            }
-          }
-
-          success = true
-        } catch (err) {
-          retries++
-          if (retries >= 3) {
-            $app
-              .logger()
-              .error(
-                'UAZAPI sync failed after 3 retries',
-                'client',
-                client.id,
-                'error',
-                err.message || String(err),
-              )
-          } else {
-            const start = new Date().getTime()
-            while (new Date().getTime() - start < backoff) {}
-            backoff *= 2
-          }
-        }
-      }
-    }
+    } catch (_) {}
 
     if (!dateToUse || isNaN(dateToUse.getTime())) {
       const ucStr = client.getString('ultimo_contato')
@@ -164,7 +68,6 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
         notif.set('user_id', userId)
         $app.save(notif)
 
-        // Integracao com o Agente de Follow-up para gerar mensagem proativa
         try {
           const exercises = $app.findRecordsByFilter(
             'exercises_library',
