@@ -10,6 +10,83 @@ routerAdd(
       return cleaned
     }
 
+    function isMediaMessage(msg, messageType) {
+      const mediaTypes = ['image', 'video', 'document', 'audio', 'myaudio', 'ptt', 'ptv', 'sticker']
+      if (mediaTypes.includes(messageType)) return true
+      if (msg && msg.fileURL) return true
+      if (msg && msg.message) {
+        if (
+          msg.message.imageMessage ||
+          msg.message.documentMessage ||
+          msg.message.audioMessage ||
+          msg.message.videoMessage ||
+          msg.message.stickerMessage
+        ) {
+          return true
+        }
+      }
+      return false
+    }
+
+    function extractMessageText(msg) {
+      if (!msg) return ''
+      if (msg.text) return msg.text
+      if (msg.body) return msg.body
+      if (msg.message) {
+        if (msg.message.conversation) return msg.message.conversation
+        if (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text)
+          return msg.message.extendedTextMessage.text
+        if (msg.message.imageMessage && msg.message.imageMessage.caption)
+          return msg.message.imageMessage.caption
+        if (msg.message.videoMessage && msg.message.videoMessage.caption)
+          return msg.message.videoMessage.caption
+        if (msg.message.documentMessage && msg.message.documentMessage.caption)
+          return msg.message.documentMessage.caption
+      }
+      if (msg.content) {
+        if (msg.content.text) return msg.content.text
+        if (msg.content.caption) return msg.content.caption
+      }
+      return ''
+    }
+
+    function downloadMediaIfNeeded(baseUrl, token, messageId, messageType) {
+      try {
+        const isAudio =
+          messageType === 'audio' || messageType === 'myaudio' || messageType === 'ptt'
+        const body = {
+          id: messageId,
+          return_link: true,
+          return_base64: false,
+          generate_mp3: true,
+          download_quoted: false,
+          transcribe: isAudio,
+        }
+        const res = $http.send({
+          url: `${baseUrl}/message/download`,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            token: token,
+          },
+          body: JSON.stringify(body),
+          timeout: 30,
+        })
+        if (res.statusCode !== 200) {
+          return { media_error: 'API returned status ' + res.statusCode }
+        }
+        const data = res.json || {}
+        const responseData = data.data || data
+        return {
+          fileURL: responseData.fileURL || responseData.file_url || responseData.url,
+          mimetype: responseData.mimetype,
+          transcription: responseData.transcription || responseData.text || '',
+        }
+      } catch (err) {
+        return { media_error: err.message || String(err) }
+      }
+    }
+
     try {
       const userId = e.auth?.id
       if (!userId) return e.unauthorizedError('Auth required')
@@ -118,14 +195,26 @@ routerAdd(
                   msg.wa_timestamp ||
                   Math.floor(Date.now() / 1000)
                 let msgType = msg.messageType || msg.wa_type || msg.type || 'text'
-                let msgBody =
-                  msg.text ||
-                  msg.body ||
-                  (msg.message && msg.message.conversation) ||
-                  (msg.message &&
-                    msg.message.extendedTextMessage &&
-                    msg.message.extendedTextMessage.text) ||
-                  `[${msgType}]`
+                let extractedText = extractMessageText(msg)
+                let msgBody = extractedText || `[${msgType}]`
+
+                let mediaUrl = ''
+                let mediaMimetype = ''
+                let mediaTranscription = ''
+                let mediaError = ''
+                let mediaType = ''
+
+                if (isMediaMessage(msg, msgType)) {
+                  mediaType = msgType
+                  const mediaData = downloadMediaIfNeeded(baseUrl, token, messageId, msgType)
+                  if (mediaData.fileURL) {
+                    mediaUrl = mediaData.fileURL
+                    mediaMimetype = mediaData.mimetype || ''
+                    mediaTranscription = mediaData.transcription || ''
+                  } else if (mediaData.media_error) {
+                    mediaError = mediaData.media_error
+                  }
+                }
 
                 let clientId = ''
                 const normPhone = normalizePhone(phone)
@@ -147,6 +236,13 @@ routerAdd(
                 record.set('user_id', userId)
                 if (clientId) record.set('client_id', clientId)
                 record.set('raw_payload', msg)
+
+                if (mediaUrl) record.set('media_url', mediaUrl)
+                if (mediaMimetype) record.set('media_mimetype', mediaMimetype)
+                if (mediaTranscription) record.set('media_transcription', mediaTranscription)
+                if (mediaError) record.set('media_error', mediaError)
+                if (mediaType) record.set('media_type', mediaType)
+
                 $app.save(record)
 
                 totalMessagesSaved++
