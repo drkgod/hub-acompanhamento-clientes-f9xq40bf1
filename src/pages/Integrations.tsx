@@ -161,10 +161,31 @@ export default function Integrations() {
                 <li>
                   Após a conexão, o webhook será configurado automaticamente em sua instância.
                 </li>
+                <li>
+                  <span className="font-semibold text-slate-900">Webhook:</span> Recebe mensagens
+                  novas automaticamente em tempo real.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-900">Sincronizar agora:</span> Importa
+                  conversas e mensagens que a UAZAPI já conhece. Use essa opção no Inbox.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-900">Buscar histórico antigo:</span>{' '}
+                  Solicita mensagens anteriores ao WhatsApp; o processo é assíncrono e as mensagens
+                  chegarão gradualmente via webhook.
+                </li>
               </ul>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nome da instância (Identificador)</label>
+                <Input
+                  placeholder="Minha Empresa WA"
+                  value={waStatus?.instance_name || ''}
+                  disabled={true}
+                />
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">URL Base da instância</label>
                 <Input
@@ -228,7 +249,7 @@ export default function Integrations() {
                     ) : (
                       <LinkIcon className="w-4 h-4 mr-2" />
                     )}
-                    Conectar
+                    Conectar e Salvar
                   </Button>
                 )}
               </div>

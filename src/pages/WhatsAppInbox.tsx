@@ -3,13 +3,27 @@ import pb from '@/lib/pocketbase/client'
 import { Link } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
-import { MessageSquare, Search, Phone, User as UserIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import {
+  MessageSquare,
+  Search,
+  Phone,
+  User as UserIcon,
+  RefreshCcw,
+  History,
+  Loader2,
+} from 'lucide-react'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, isToday, isYesterday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
 
 interface Conversation {
+  chat_id: string
+  phone: string
   client_id: string
   nome: string
   telefone: string
@@ -32,8 +46,11 @@ interface Message {
 export default function WhatsAppInbox() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [search, setSearch] = useState('')
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [requestHistory, setRequestHistory] = useState(false)
+  const { toast } = useToast()
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -55,16 +72,18 @@ export default function WhatsAppInbox() {
 
   useRealtime('whatsapp_messages', () => {
     loadConversations()
-    if (selectedClientId) loadMessages(selectedClientId)
+    if (selectedChatId) loadMessages(selectedChatId)
   })
 
-  const loadMessages = async (clientId: string) => {
+  const loadMessages = async (chatId: string) => {
     try {
-      const records = await pb.collection('whatsapp_messages').getList<Message>(1, 150, {
-        filter: `client_id = '${clientId}'`,
-        sort: '-timestamp',
-      })
-      setMessages(records.items.reverse())
+      const res = await pb.send<{ messages: Message[] }>(
+        `/backend/v1/whatsapp/conversations/${encodeURIComponent(chatId)}/messages`,
+        {
+          method: 'GET',
+        },
+      )
+      setMessages(res.messages || [])
       setTimeout(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
       }, 50)
@@ -74,17 +93,40 @@ export default function WhatsAppInbox() {
   }
 
   useEffect(() => {
-    if (selectedClientId) {
-      loadMessages(selectedClientId)
+    if (selectedChatId) {
+      loadMessages(selectedChatId)
     }
-  }, [selectedClientId])
+  }, [selectedChatId])
 
-  const filteredConversations = conversations.filter((c) =>
-    c.nome?.toLowerCase().includes(search.toLowerCase()),
+  const handleSync = async () => {
+    try {
+      setIsSyncing(true)
+      await pb.send('/backend/v1/whatsapp/sync-now', {
+        method: 'POST',
+        body: JSON.stringify({ request_history: requestHistory }),
+      })
+      toast({
+        title: requestHistory
+          ? 'Solicitação de histórico enviada'
+          : 'Sincronização concluída com sucesso',
+      })
+      loadConversations()
+      if (selectedChatId) loadMessages(selectedChatId)
+    } catch (err: any) {
+      toast({ title: 'Erro na sincronização', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  const filteredConversations = conversations.filter(
+    (c) =>
+      (c.nome || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone || '').includes(search),
   )
   const unreadTotal = conversations.reduce((acc, c) => acc + c.total_nao_respondidas, 0)
 
-  const selectedConv = conversations.find((c) => c.client_id === selectedClientId)
+  const selectedConv = conversations.find((c) => c.chat_id === selectedChatId)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -102,6 +144,7 @@ export default function WhatsAppInbox() {
   }
 
   const formatMessageTime = (ts: number) => {
+    if (!ts) return ''
     const date = new Date(ts < 1000000000000 ? ts * 1000 : ts)
     if (isToday(date)) return format(date, 'HH:mm')
     if (isYesterday(date)) return 'Ontem'
@@ -127,7 +170,7 @@ export default function WhatsAppInbox() {
   return (
     <div className="flex h-full bg-slate-50">
       {/* Sidebar */}
-      <div className="w-[320px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full">
+      <div className="w-[340px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full">
         <header className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
           <h2 className="font-bold text-slate-800 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-600" />
@@ -139,39 +182,75 @@ export default function WhatsAppInbox() {
             </span>
           )}
         </header>
+
+        <div className="p-3 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="w-full flex-1"
+              variant="secondary"
+              size="sm"
+            >
+              {isSyncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCcw className="w-4 h-4 mr-2" />
+              )}
+              Sincronizar Agora
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2 px-1">
+            <Checkbox
+              id="history"
+              checked={requestHistory}
+              onCheckedChange={(c) => setRequestHistory(!!c)}
+            />
+            <Label
+              htmlFor="history"
+              className="text-xs text-slate-600 cursor-pointer flex items-center gap-1"
+            >
+              <History className="w-3 h-3" /> Buscar histórico antigo
+            </Label>
+          </div>
+        </div>
+
         <div className="p-3 border-b border-slate-100 shrink-0">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar cliente..."
+              placeholder="Buscar conversa..."
               className="pl-9 h-9 bg-slate-50 border-slate-200 text-sm"
             />
           </div>
         </div>
+
         <div className="flex-1 overflow-y-auto">
           {filteredConversations.map((c) => (
             <button
-              key={c.client_id}
-              onClick={() => setSelectedClientId(c.client_id)}
+              key={c.chat_id}
+              onClick={() => setSelectedChatId(c.chat_id)}
               className={cn(
                 'w-full p-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left',
-                selectedClientId === c.client_id && 'bg-blue-50/50 hover:bg-blue-50/50',
+                selectedChatId === c.chat_id && 'bg-blue-50/50 hover:bg-blue-50/50',
               )}
             >
               <div className="relative shrink-0">
                 <Avatar className="w-10 h-10 border border-slate-100">
                   <AvatarFallback className="bg-slate-100 text-slate-600 font-medium">
-                    {c.nome.charAt(0)}
+                    {c.nome?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div
-                  className={cn(
-                    'absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white',
-                    getStatusColor(c.status_inatividade),
-                  )}
-                />
+                {c.client_id && (
+                  <div
+                    className={cn(
+                      'absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white',
+                      getStatusColor(c.status_inatividade),
+                    )}
+                  />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline mb-0.5">
@@ -205,14 +284,22 @@ export default function WhatsAppInbox() {
       </div>
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#EFEAE2]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#EFEAE2] relative">
+        {/* Chat Background Pattern */}
+        <div
+          className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none z-0"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+
         {selectedConv ? (
           <>
             <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
               <div className="flex items-center gap-3">
                 <Avatar className="w-9 h-9 border border-slate-100">
                   <AvatarFallback className="bg-slate-100 text-slate-600 font-medium">
-                    {selectedConv.nome.charAt(0)}
+                    {selectedConv.nome?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -221,20 +308,22 @@ export default function WhatsAppInbox() {
                   </h3>
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
                     <Phone className="w-3 h-3" />
-                    {selectedConv.telefone || 'Sem número'}
+                    {selectedConv.telefone || selectedConv.phone || 'Sem número'}
                   </div>
                 </div>
               </div>
-              <Link
-                to={`/clientes/${selectedConv.client_id}`}
-                className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
-              >
-                <UserIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Ver Perfil</span>
-              </Link>
+              {selectedConv.client_id && (
+                <Link
+                  to={`/clientes/${selectedConv.client_id}`}
+                  className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  <span className="hidden sm:inline">Ver Perfil</span>
+                </Link>
+              )}
             </header>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 z-10">
               {groupMessages(messages).map((group) => (
                 <div key={group.date} className="space-y-4">
                   <div className="flex justify-center">
@@ -252,15 +341,14 @@ export default function WhatsAppInbox() {
                         className={cn(
                           'max-w-[75%] sm:max-w-[60%] px-4 py-2.5 shadow-sm text-[15px] relative',
                           m.from_me
-                            ? 'bg-[#0B57D0] text-white rounded-[18px] rounded-tr-[4px]'
-                            : 'bg-white text-slate-800 rounded-[18px] rounded-tl-[4px]',
+                            ? 'bg-[#d9fdd3] text-slate-800 rounded-[18px] rounded-tr-[4px] border border-[#c3ebbc]'
+                            : 'bg-white text-slate-800 rounded-[18px] rounded-tl-[4px] border border-white',
                         )}
                       >
                         <p className="whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
                         <span
                           className={cn(
-                            'text-[10px] float-right mt-2 ml-3 font-medium',
-                            m.from_me ? 'text-blue-100' : 'text-slate-400',
+                            'text-[10px] float-right mt-2 ml-3 font-medium text-slate-400',
                           )}
                         >
                           {format(
@@ -278,7 +366,7 @@ export default function WhatsAppInbox() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-white/50 backdrop-blur-sm z-10 m-6 rounded-2xl border border-white">
             <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-200">
               <MessageSquare className="w-8 h-8 text-slate-300" />
             </div>

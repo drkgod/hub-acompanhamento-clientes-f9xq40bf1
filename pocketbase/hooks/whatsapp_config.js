@@ -39,8 +39,10 @@ routerAdd(
             token: apiToken,
           },
           body: JSON.stringify({
+            enabled: true,
             url: webhookUrl,
-            webhook_events: ['messages.upsert', 'connection.update'],
+            events: ['messages', 'messages_update', 'history', 'connection'],
+            excludeMessages: ['wasSentByApi'],
             headers: { token: webhookSecret },
           }),
           timeout: 10,
@@ -124,6 +126,8 @@ routerAdd(
           .db()
           .newQuery(`
         SELECT 
+          m.chat_id,
+          m.phone,
           c.id as client_id,
           c.nome,
           c.telefone,
@@ -131,14 +135,24 @@ routerAdd(
           m.body as ultima_mensagem_body,
           m.timestamp as ultima_mensagem_timestamp,
           m.from_me as ultima_mensagem_from_me,
-          (SELECT COUNT(*) FROM whatsapp_messages m2 WHERE m2.client_id = c.id AND m2.from_me = 0 AND m2.timestamp > (
-            SELECT COALESCE(MAX(timestamp), 0) FROM whatsapp_messages m3 WHERE m3.client_id = c.id AND m3.from_me = 1
-          )) as total_nao_respondidas
-        FROM clients c
-        JOIN whatsapp_messages m ON m.client_id = c.id
-        WHERE c.user_id = {:userId}
-        AND m.timestamp = (
-          SELECT MAX(timestamp) FROM whatsapp_messages m4 WHERE m4.client_id = c.id
+          (SELECT COUNT(*) FROM whatsapp_messages m2 
+            WHERE COALESCE(NULLIF(m2.chat_id, ''), m2.phone) = COALESCE(NULLIF(m.chat_id, ''), m.phone)
+            AND m2.from_me = 0 
+            AND m2.timestamp > (
+              SELECT COALESCE(MAX(m3.timestamp), 0) FROM whatsapp_messages m3 
+              WHERE COALESCE(NULLIF(m3.chat_id, ''), m3.phone) = COALESCE(NULLIF(m.chat_id, ''), m.phone)
+              AND m3.from_me = 1
+            )
+          ) as total_nao_respondidas
+        FROM whatsapp_messages m
+        LEFT JOIN clients c ON m.client_id = c.id
+        WHERE m.user_id = {:userId}
+        AND m.id IN (
+          SELECT id FROM (
+            SELECT id, MAX(timestamp) FROM whatsapp_messages
+            WHERE user_id = {:userId}
+            GROUP BY COALESCE(NULLIF(chat_id, ''), phone)
+          )
         )
         ORDER BY m.timestamp DESC
       `)
@@ -149,10 +163,12 @@ routerAdd(
       }
 
       const conversations = result.map((r) => ({
+        chat_id: r.chat_id || r.phone,
+        phone: r.phone,
         client_id: r.client_id,
-        nome: r.nome,
-        telefone: r.telefone,
-        status_inatividade: r.status_inatividade,
+        nome: r.nome || r.phone,
+        telefone: r.telefone || r.phone,
+        status_inatividade: r.status_inatividade || 'sem_status',
         ultima_mensagem_body: r.ultima_mensagem_body,
         ultima_mensagem_timestamp: Number(r.ultima_mensagem_timestamp),
         ultima_mensagem_from_me:

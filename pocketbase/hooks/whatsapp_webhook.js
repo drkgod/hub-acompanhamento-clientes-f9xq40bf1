@@ -11,24 +11,60 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
     const body = e.requestInfo().body || {}
     const event = body.event
 
-    if (event === 'messages.upsert') {
-      const messages = body.data?.messages || []
-      const instanceName = body.instance
+    if (
+      event === 'messages' ||
+      event === 'messages_update' ||
+      event === 'history' ||
+      event === 'messages.upsert'
+    ) {
+      let messages = []
+      if (body.data?.messages) {
+        messages = Array.isArray(body.data.messages) ? body.data.messages : [body.data.messages]
+      } else if (Array.isArray(body.data)) {
+        messages = body.data
+      } else if (body.data) {
+        messages = [body.data]
+      }
+
+      const instanceName = body.instance || ''
 
       for (const msg of messages) {
-        let phone = msg.key?.remoteJid?.split('@')[0] || ''
-        const messageId = msg.key?.id
-        const fromMe = msg.key?.fromMe || false
-        const timestamp = msg.messageTimestamp
-
+        let phone = ''
+        let chatId = ''
+        let messageId = ''
+        let fromMe = false
+        let timestamp = 0
         let msgBody = ''
-        const msgType = Object.keys(msg.message || {})[0]
-        if (msg.message?.conversation) {
-          msgBody = msg.message.conversation
-        } else if (msg.message?.extendedTextMessage?.text) {
-          msgBody = msg.message.extendedTextMessage.text
+        let msgType = ''
+
+        if (msg.key) {
+          chatId = msg.key.remoteJid || msg.key.chatId || msg.chatId || ''
+          phone = chatId.split('@')[0] || ''
+          messageId = msg.key.id || msg.messageId || ''
+          fromMe = msg.key.fromMe || false
+          timestamp = msg.messageTimestamp || msg.timestamp || 0
         } else {
-          msgBody = `[${msgType || 'Mensagem'}]`
+          chatId = msg.remoteJid || msg.chatId || ''
+          phone = chatId.split('@')[0] || ''
+          messageId = msg.id || msg.messageId || ''
+          fromMe = msg.fromMe || false
+          timestamp = msg.timestamp || msg.messageTimestamp || 0
+        }
+
+        const actualMessage = msg.message || msg
+        msgType =
+          msg.messageType ||
+          Object.keys(actualMessage || {}).find((k) => k !== 'messageContextInfo') ||
+          'text'
+
+        if (actualMessage.conversation) {
+          msgBody = actualMessage.conversation
+        } else if (actualMessage.extendedTextMessage?.text) {
+          msgBody = actualMessage.extendedTextMessage.text
+        } else if (msg.text) {
+          msgBody = msg.text
+        } else if (typeof msgBody === 'string' && !msgBody) {
+          msgBody = `[${msgType}]`
         }
 
         if (!messageId || !phone) continue
@@ -73,21 +109,23 @@ routerAdd('POST', '/backend/v1/whatsapp-webhook', (e) => {
           const msgCol = $app.findCollectionByNameOrId('whatsapp_messages')
           const record = new Record(msgCol)
           record.set('message_id', messageId)
+          record.set('chat_id', chatId)
           record.set('phone', phone)
           record.set('body', msgBody)
           record.set('timestamp', Number(timestamp) || 0)
           record.set('from_me', fromMe)
-          record.set('type', msgType || 'text')
+          record.set('type', msgType)
           record.set('user_id', userId)
           if (clientId) {
             record.set('client_id', clientId)
           }
+          record.set('raw_payload', msg)
           $app.save(record)
         }
       }
-    } else if (event === 'connection.update') {
+    } else if (event === 'connection.update' || event === 'connection') {
       const instanceName = body.instance
-      const state = body.data?.state
+      const state = body.data?.state || body.state
       if (instanceName && state) {
         try {
           const instance = $app.findFirstRecordByData(
