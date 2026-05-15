@@ -190,6 +190,13 @@ routerAdd(
         'Transcricao ainda sendo processada pelo tl;dv. Tente reimportar em alguns minutos.'
     }
 
+    const originalLength = transcriptText.length
+    if (originalLength > 80000) {
+      transcriptText =
+        transcriptText.slice(0, 80000) +
+        `... [Transcricao truncada. Texto completo tem ${originalLength} caracteres.]`
+    }
+
     const transcriptsCol = $app.findCollectionByNameOrId('transcripts')
     const transcript = new Record(transcriptsCol)
     transcript.set('meeting_id', meeting.id)
