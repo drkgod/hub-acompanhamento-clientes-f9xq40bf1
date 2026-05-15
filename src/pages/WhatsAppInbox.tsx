@@ -17,7 +17,6 @@ import {
   Link2,
   Sparkles,
 } from 'lucide-react'
-import { useRealtime } from '@/hooks/use-realtime'
 import { format, isToday, isYesterday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -107,14 +106,17 @@ export default function WhatsAppInbox() {
     loadConversations()
   }, [])
 
-  useRealtime('whatsapp_messages', () => {
-    loadConversations()
-    if (selectedChatId) loadMessages(selectedChatId)
-  })
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadConversations()
+      if (selectedChatId) {
+        loadMessages(selectedChatId)
+        loadAnalysis(selectedChatId)
+      }
+    }, 15000)
 
-  useRealtime('whatsapp_analyses', () => {
-    if (selectedChatId) loadAnalysis(selectedChatId)
-  })
+    return () => clearInterval(interval)
+  }, [selectedChatId])
 
   const handleLinkClient = async (clientId: string) => {
     if (!selectedConv) return
