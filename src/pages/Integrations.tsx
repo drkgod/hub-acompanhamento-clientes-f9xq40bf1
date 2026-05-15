@@ -1,15 +1,37 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import pb from '@/lib/pocketbase/client'
-import { Copy, Check, MessageSquare, Link as LinkIcon, Loader2, Unplug } from 'lucide-react'
+import {
+  Copy,
+  Check,
+  MessageSquare,
+  Link as LinkIcon,
+  Loader2,
+  Unplug,
+  CloudDownload,
+} from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Integrations() {
   const [copiedSecret, setCopiedSecret] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
+
+  // TLDV Import State
+  const [tldvEmail, setTldvEmail] = useState('Rodrigo@adapta.org')
+  const [tldvLimit, setTldvLimit] = useState(25)
+  const [tldvImporting, setTldvImporting] = useState(false)
+  const [tldvImportProgress, setTldvImportProgress] = useState({ current: 0, total: 1 })
+  const [tldvStats, setTldvStats] = useState({
+    created_clients: 0,
+    created_meetings: 0,
+    created_transcripts: 0,
+    skipped_duplicates: 0,
+    skipped_not_involving_email: 0,
+  })
   const [tldvInfo, setTldvInfo] = useState<{ secret: string; instanceUrl: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
@@ -127,6 +149,66 @@ export default function Integrations() {
     navigator.clipboard.writeText(webhookUrl)
     setCopiedUrl(true)
     setTimeout(() => setCopiedUrl(false), 2000)
+  }
+
+  const handleTldvImport = async () => {
+    if (!tldvEmail) return
+    setTldvImporting(true)
+    setTldvStats({
+      created_clients: 0,
+      created_meetings: 0,
+      created_transcripts: 0,
+      skipped_duplicates: 0,
+      skipped_not_involving_email: 0,
+    })
+    setTldvImportProgress({ current: 0, total: 1 })
+
+    let page = 1
+    let isDone = false
+
+    try {
+      while (!isDone) {
+        const res = await pb.send<{
+          done: boolean
+          next_page?: number
+          pages?: number
+          created_clients?: number
+          created_meetings?: number
+          created_transcripts?: number
+          skipped_duplicates?: number
+          skipped_not_involving_email?: number
+        }>('/backend/v1/tldv/import-my-calls', {
+          method: 'POST',
+          body: JSON.stringify({ email: tldvEmail, page, limit: Number(tldvLimit) }),
+        })
+
+        setTldvStats((prev) => ({
+          created_clients: prev.created_clients + (res.created_clients || 0),
+          created_meetings: prev.created_meetings + (res.created_meetings || 0),
+          created_transcripts: prev.created_transcripts + (res.created_transcripts || 0),
+          skipped_duplicates: prev.skipped_duplicates + (res.skipped_duplicates || 0),
+          skipped_not_involving_email:
+            prev.skipped_not_involving_email + (res.skipped_not_involving_email || 0),
+        }))
+
+        setTldvImportProgress({ current: page, total: res.pages || Math.max(page, 1) })
+
+        if (res.done) {
+          isDone = true
+          toast({ title: 'Importação TLDV concluída' })
+        } else {
+          page = res.next_page || page + 1
+        }
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro na importação',
+        description: err.message || 'A importação parou devido a um erro',
+        variant: 'destructive',
+      })
+    } finally {
+      setTldvImporting(false)
+    }
   }
 
   return (
@@ -349,6 +431,110 @@ export default function Integrations() {
                     </p>
                   </div>
                 </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CloudDownload className="w-5 h-5 text-indigo-600" />
+              Importar histórico TLDV
+            </CardTitle>
+            <CardDescription>
+              Importe suas reuniões antigas do TLDV em lotes. Configure o email alvo e o limite por
+              página para processamento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={tldvEmail}
+                  onChange={(e) => setTldvEmail(e.target.value)}
+                  disabled={tldvImporting}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Limite por página</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={tldvLimit}
+                  onChange={(e) => setTldvLimit(Number(e.target.value))}
+                  disabled={tldvImporting}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Button onClick={handleTldvImport} disabled={tldvImporting || !tldvEmail}>
+                {tldvImporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CloudDownload className="w-4 h-4 mr-2" />
+                )}
+                Importar calls antigas
+              </Button>
+
+              {tldvImportProgress.current > 0 && (
+                <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm font-medium">
+                      <span>
+                        Progresso (Página {tldvImportProgress.current} de {tldvImportProgress.total}
+                        )
+                      </span>
+                      <span>
+                        {Math.min(
+                          100,
+                          Math.round((tldvImportProgress.current / tldvImportProgress.total) * 100),
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <Progress
+                      value={(tldvImportProgress.current / tldvImportProgress.total) * 100}
+                      className="h-2"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">Clientes criados</span>
+                      <span className="font-semibold text-lg">{tldvStats.created_clients}</span>
+                    </div>
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">Reuniões criadas</span>
+                      <span className="font-semibold text-lg">{tldvStats.created_meetings}</span>
+                    </div>
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">
+                        Transcrição criadas
+                      </span>
+                      <span className="font-semibold text-lg">{tldvStats.created_transcripts}</span>
+                    </div>
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">
+                        Duplicadas ignoradas
+                      </span>
+                      <span className="font-semibold text-lg">{tldvStats.skipped_duplicates}</span>
+                    </div>
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">
+                        Reuniões ignoradas
+                      </span>
+                      <span className="font-semibold text-lg">
+                        {tldvStats.skipped_not_involving_email}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </CardContent>
