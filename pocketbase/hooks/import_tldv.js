@@ -21,63 +21,86 @@ routerAdd(
     if (!stages || stages.length === 0) return e.badRequestError('No pipeline stages found')
     const firstStage = stages[0]
 
-    let res
-    try {
-      res = $http.send({
-        url: `https://pasta.tldv.io/v1alpha1/meetings`,
-        method: 'GET',
-        headers: { 'x-api-key': apiKey },
-        timeout: 30,
-      })
-    } catch (err) {
-      $app.logger().error('tl;dv API transport error', 'error', err.message)
-      return e.internalServerError('Error communicating with tl;dv API')
-    }
-
     let meetingData = null
-    if (
-      res.statusCode === 200 &&
-      res.json &&
-      Array.isArray(res.json.meetings) &&
-      res.json.meetings.length > 0
-    ) {
-      meetingData = res.json.meetings[0]
+    let invitee = null
+
+    let page = 1
+    const limit = 50
+    let hasMore = true
+
+    while (hasMore) {
+      let res
+      try {
+        res = $http.send({
+          url: `https://pasta.tldv.io/v1alpha1/meetings?limit=${limit}&page=${page}`,
+          method: 'GET',
+          headers: { 'x-api-key': apiKey },
+          timeout: 30,
+        })
+      } catch (err) {
+        $app.logger().error('tl;dv API transport error', 'error', err.message)
+        return e.internalServerError('Error communicating with tl;dv API')
+      }
+
+      if (
+        res.statusCode !== 200 ||
+        !res.json ||
+        !Array.isArray(res.json.meetings) ||
+        res.json.meetings.length === 0
+      ) {
+        hasMore = false
+        break
+      }
+
+      for (const m of res.json.meetings) {
+        if (Array.isArray(m.invitees)) {
+          const foundInvitee = m.invitees.find(
+            (i) => i.email && i.email.toLowerCase() === email.toLowerCase(),
+          )
+          if (foundInvitee) {
+            meetingData = m
+            invitee = foundInvitee
+            break
+          }
+        }
+      }
+
+      if (meetingData) {
+        break
+      }
+
+      page++
     }
 
     if (!meetingData) {
       return e.notFoundError(
-        'Nenhuma gravação encontrada na sua conta tl;dv. Verifique se você tem reuniões gravadas.',
+        `Nenhuma gravação encontrada para o email ${email} na sua conta tl;dv. Verifique se o participante está listado na reunião.`,
       )
     }
 
-    let invitee = null
-    if (Array.isArray(meetingData.invitees)) {
-      invitee = meetingData.invitees.find(
-        (i) => i.email && i.email.toLowerCase() !== email.toLowerCase(),
-      )
-    }
-
-    const finalEmail = invitee && invitee.email ? invitee.email : ''
+    const finalEmail = invitee && invitee.email ? invitee.email : email
     const finalName = invitee && invitee.name ? invitee.name : email.split('@')[0]
 
     let client
     try {
-      if (!finalEmail) throw new Error('No email to search')
       client = $app.findFirstRecordByFilter('clients', 'email = {:email} && user_id = {:userId}', {
         email: finalEmail,
         userId,
       })
-    } catch (_) {
-      const clientsCol = $app.findCollectionByNameOrId('clients')
-      client = new Record(clientsCol)
-      client.set('nome', finalName)
-      client.set('empresa', meetingData.company || 'Empresa Importada')
-      if (finalEmail) {
+    } catch (err) {
+      const errMsg = err.message ? err.message.toLowerCase() : ''
+      if (errMsg.includes('no rows') || errMsg.includes('not found')) {
+        const clientsCol = $app.findCollectionByNameOrId('clients')
+        client = new Record(clientsCol)
+        client.set('nome', finalName)
+        client.set('empresa', meetingData.company || 'Empresa Importada')
         client.set('email', finalEmail)
+        client.set('estagio_id', firstStage.id)
+        client.set('user_id', userId)
+        $app.save(client)
+      } else {
+        throw err
       }
-      client.set('estagio_id', firstStage.id)
-      client.set('user_id', userId)
-      $app.save(client)
     }
 
     const meetingsCol = $app.findCollectionByNameOrId('meetings')
@@ -92,7 +115,6 @@ routerAdd(
     meeting.set('plataforma', 'tl;dv')
     meeting.set('status', 'realizada')
     meeting.set('user_id', userId)
-    meeting.set('recording_id', meetingData.id || 'tldv_' + $security.randomString(8))
     $app.save(meeting)
 
     let transcriptText = ''
