@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-15T19:16:57.351Z",
+  "generatedAt": "2026-05-15T19:21:36.712Z",
   "collections": [
     {
       "name": "users",
@@ -933,6 +933,92 @@
         "CREATE UNIQUE INDEX idx_whatsapp_messages_id ON whatsapp_messages (message_id)",
         "CREATE INDEX idx_whatsapp_messages_client ON whatsapp_messages (client_id)",
         "CREATE INDEX idx_whatsapp_messages_timestamp ON whatsapp_messages (timestamp DESC)"
+      ]
+    },
+    {
+      "name": "whatsapp_analyses",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user_id = @request.auth.id",
+        "view": "@request.auth.id != '' && user_id = @request.auth.id",
+        "create": "@request.auth.id != '' && user_id = @request.auth.id",
+        "update": "@request.auth.id != '' && user_id = @request.auth.id",
+        "delete": "@request.auth.id != '' && user_id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "chat_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sentiment",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pending_questions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "suggested_followup",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "opportunities",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_message_timestamp",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_wa_analyses_chat_user ON whatsapp_analyses (chat_id, user_id)"
       ]
     }
   ]

@@ -15,6 +15,7 @@ import {
   History,
   Loader2,
   Link2,
+  Sparkles,
 } from 'lucide-react'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, isToday, isYesterday } from 'date-fns'
@@ -28,7 +29,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import type { Client } from '@/types'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
+import type { Client, WhatsAppAnalysis } from '@/types'
 
 interface Conversation {
   chat_id: string
@@ -62,6 +70,9 @@ export default function WhatsAppInbox() {
   const { toast } = useToast()
 
   const [clients, setClients] = useState<Client[]>([])
+  const [analysis, setAnalysis] = useState<WhatsAppAnalysis | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isAnalysisSheetOpen, setIsAnalysisSheetOpen] = useState(false)
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
 
@@ -101,6 +112,10 @@ export default function WhatsAppInbox() {
     if (selectedChatId) loadMessages(selectedChatId)
   })
 
+  useRealtime('whatsapp_analyses', () => {
+    if (selectedChatId) loadAnalysis(selectedChatId)
+  })
+
   const handleLinkClient = async (clientId: string) => {
     if (!selectedConv) return
     try {
@@ -124,6 +139,17 @@ export default function WhatsAppInbox() {
     }
   }
 
+  const loadAnalysis = async (chatId: string) => {
+    try {
+      const res = await pb
+        .collection('whatsapp_analyses')
+        .getFirstListItem<WhatsAppAnalysis>(`chat_id="${chatId}"`)
+      setAnalysis(res)
+    } catch (err) {
+      setAnalysis(null)
+    }
+  }
+
   const loadMessages = async (chatId: string) => {
     try {
       const res = await pb.send<{ messages: Message[] }>(
@@ -144,8 +170,30 @@ export default function WhatsAppInbox() {
   useEffect(() => {
     if (selectedChatId) {
       loadMessages(selectedChatId)
+      loadAnalysis(selectedChatId)
+    } else {
+      setAnalysis(null)
     }
   }, [selectedChatId])
+
+  const handleAnalyze = async () => {
+    if (!selectedChatId) return
+    try {
+      setIsAnalyzing(true)
+      setIsAnalysisSheetOpen(true)
+      const res = await pb.send<WhatsAppAnalysis>('/backend/v1/whatsapp/analyze-conversation', {
+        method: 'POST',
+        body: JSON.stringify({ chat_id: selectedChatId }),
+      })
+      setAnalysis(res)
+      toast({ title: 'Análise concluída com sucesso!' })
+    } catch (err: any) {
+      toast({ title: 'Erro na análise', description: err.message, variant: 'destructive' })
+      setIsAnalysisSheetOpen(false)
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const handleSync = async () => {
     try {
@@ -363,25 +411,50 @@ export default function WhatsAppInbox() {
                   </div>
                 </div>
               </div>
-              {selectedConv.client_id ? (
-                <Link
-                  to={`/clientes/${selectedConv.client_id}`}
-                  className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  <UserIcon className="w-4 h-4" />
-                  <span className="hidden sm:inline">Ver Perfil</span>
-                </Link>
-              ) : (
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  onClick={() => setIsLinkModalOpen(true)}
-                  className="text-slate-700 bg-white shadow-sm flex items-center gap-2"
+                  onClick={() => {
+                    if (analysis) {
+                      setIsAnalysisSheetOpen(true)
+                    } else {
+                      handleAnalyze()
+                    }
+                  }}
+                  disabled={isAnalyzing}
+                  className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 shadow-sm flex items-center gap-2"
                 >
-                  <Link2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Vincular Cliente</span>
+                  {isAnalyzing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {analysis ? 'Ver Análise' : 'Analisar Conversa'}
+                  </span>
                 </Button>
-              )}
+
+                {selectedConv.client_id ? (
+                  <Link
+                    to={`/clientes/${selectedConv.client_id}`}
+                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">Ver Perfil</span>
+                  </Link>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsLinkModalOpen(true)}
+                    className="text-slate-700 bg-white shadow-sm flex items-center gap-2"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Vincular</span>
+                  </Button>
+                )}
+              </div>
             </header>
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 z-10">
@@ -491,6 +564,97 @@ export default function WhatsAppInbox() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={isAnalysisSheetOpen} onOpenChange={setIsAnalysisSheetOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-slate-50 p-0">
+          <SheetHeader className="p-6 pb-4 bg-white border-b border-slate-200 sticky top-0 z-10">
+            <SheetTitle className="flex items-center gap-2 text-indigo-700">
+              <Sparkles className="w-5 h-5" />
+              Análise com IA
+            </SheetTitle>
+            <SheetDescription>
+              Resumo inteligente e insights extraídos da conversa.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="p-6 space-y-6">
+            {isAnalyzing ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
+                <p className="font-medium text-slate-700">Analisando histórico...</p>
+                <p className="text-sm text-center mt-2 max-w-[250px]">
+                  Lendo mensagens, processando sentimentos e gerando insights.
+                </p>
+              </div>
+            ) : analysis ? (
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
+                    Resumo
+                  </h4>
+                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                    {analysis.summary}
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
+                    Sentimento
+                  </h4>
+                  <p className="text-slate-600 text-sm leading-relaxed">{analysis.sentiment}</p>
+                </div>
+
+                {analysis.pending_questions && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
+                      Perguntas Pendentes
+                    </h4>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {analysis.pending_questions}
+                    </p>
+                  </div>
+                )}
+
+                {analysis.suggested_followup && (
+                  <div className="bg-indigo-50 rounded-xl p-4 shadow-sm border border-indigo-100">
+                    <h4 className="text-sm font-bold text-indigo-800 uppercase tracking-wider mb-2">
+                      Sugestão de Follow-up
+                    </h4>
+                    <p className="text-indigo-900/80 text-sm leading-relaxed whitespace-pre-wrap">
+                      {analysis.suggested_followup}
+                    </p>
+                  </div>
+                )}
+
+                {analysis.opportunities && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
+                      Oportunidades & Ações
+                    </h4>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {analysis.opportunities}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing}
+                  >
+                    <RefreshCcw className="w-4 h-4 mr-2" />
+                    Atualizar Análise
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-500">Nenhuma análise disponível.</div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

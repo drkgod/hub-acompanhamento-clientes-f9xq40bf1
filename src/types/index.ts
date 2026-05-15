@@ -90,3 +90,18 @@ export interface Notification {
   user_id: string
   created: string
 }
+
+export interface WhatsAppAnalysis {
+  id: string
+  user_id: string
+  client_id?: string
+  chat_id: string
+  summary?: string
+  sentiment?: string
+  pending_questions?: string
+  suggested_followup?: string
+  opportunities?: string
+  last_message_timestamp?: number
+  created: string
+  updated: string
+}
