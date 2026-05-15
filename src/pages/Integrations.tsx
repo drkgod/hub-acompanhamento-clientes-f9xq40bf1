@@ -167,7 +167,8 @@ export default function Integrations() {
                 </li>
                 <li>
                   <span className="font-semibold text-slate-900">Sincronizar agora:</span> Importa
-                  chats e mensagens que a UAZAPI já conhece localmente (Sync).
+                  chats e mensagens que a UAZAPI já conhece localmente (Sync) usando os endpoints{' '}
+                  <code>/chat/find</code> e <code>/message/find</code>.
                 </li>
                 <li>
                   <span className="font-semibold text-slate-900">Buscar histórico antigo:</span>{' '}
