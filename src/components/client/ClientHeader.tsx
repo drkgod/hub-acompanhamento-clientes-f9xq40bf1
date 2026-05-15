@@ -13,7 +13,7 @@ export function ClientHeader({ client }: { client: Client }) {
   const isWhatsAppPage = location.pathname.endsWith('/whatsapp')
 
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-5 border rounded-xl shadow-sm">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 border rounded-xl shadow-sm">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" asChild className="h-8 w-8">
