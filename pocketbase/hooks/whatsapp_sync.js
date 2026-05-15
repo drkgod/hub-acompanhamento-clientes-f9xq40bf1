@@ -10,25 +10,26 @@ routerAdd(
       return cleaned
     }
 
-    function isMediaMessage(msg, messageType) {
-      const mediaTypes = ['image', 'video', 'document', 'audio', 'myaudio', 'ptt', 'ptv', 'sticker']
-      if (mediaTypes.includes(messageType)) return true
-      if (msg && msg.fileURL) return true
-      if (msg && msg.message) {
-        if (
-          msg.message.imageMessage ||
-          msg.message.documentMessage ||
-          msg.message.audioMessage ||
-          msg.message.videoMessage ||
-          msg.message.stickerMessage
-        ) {
-          return true
-        }
+    function extractMessageType(msg) {
+      let type = msg.messageType || msg.wa_type || msg.type || ''
+      if (!type && msg.message) {
+        if (msg.message.imageMessage) type = 'image'
+        else if (msg.message.videoMessage) type = 'video'
+        else if (msg.message.documentMessage) type = 'document'
+        else if (msg.message.audioMessage) type = 'audio'
+        else if (msg.message.stickerMessage) type = 'sticker'
+        else if (msg.message.extendedTextMessage) type = 'text'
+        else if (msg.message.conversation) type = 'text'
       }
-      return false
+      return type || 'text'
     }
 
-    function extractMessageText(msg) {
+    function isMediaMessage(msg, type) {
+      const mediaTypes = ['image', 'video', 'document', 'audio', 'myaudio', 'ptt', 'ptv', 'sticker']
+      return mediaTypes.includes(type) || !!(msg && msg.fileURL)
+    }
+
+    function extractCaption(msg) {
       if (!msg) return ''
       if (msg.text) return msg.text
       if (msg.body) return msg.body
@@ -50,41 +51,12 @@ routerAdd(
       return ''
     }
 
-    function downloadMediaIfNeeded(baseUrl, token, messageId, messageType) {
-      try {
-        const isAudio =
-          messageType === 'audio' || messageType === 'myaudio' || messageType === 'ptt'
-        const body = {
-          id: messageId,
-          return_link: true,
-          return_base64: false,
-          generate_mp3: true,
-          download_quoted: false,
-          transcribe: isAudio,
-        }
-        const res = $http.send({
-          url: `${baseUrl}/message/download`,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            token: token,
-          },
-          body: JSON.stringify(body),
-          timeout: 30,
-        })
-        if (res.statusCode !== 200) {
-          return { media_error: 'API returned status ' + res.statusCode }
-        }
-        const data = res.json || {}
-        const responseData = data.data || data
-        return {
-          fileURL: responseData.fileURL || responseData.file_url || responseData.url,
-          mimetype: responseData.mimetype,
-          transcription: responseData.transcription || responseData.text || '',
-        }
-      } catch (err) {
-        return { media_error: err.message || String(err) }
-      }
+    function extractFilename(msg) {
+      if (msg.fileName) return msg.fileName
+      if (msg.filename) return msg.filename
+      if (msg.docName) return msg.docName
+      if (msg.message?.documentMessage?.fileName) return msg.message.documentMessage.fileName
+      return ''
     }
 
     try {
@@ -144,7 +116,15 @@ routerAdd(
             historyRequested++
           } catch (_) {}
         }
-        console.log('totalChats:', totalChats, 'historyRequested:', historyRequested)
+        $app
+          .logger()
+          .info(
+            'WhatsApp history sync requested',
+            'totalChats',
+            totalChats,
+            'historyRequested',
+            historyRequested,
+          )
         return e.json(200, {
           ok: true,
           message:
@@ -178,7 +158,7 @@ routerAdd(
             if (msgsRes.statusCode === 200 && msgsRes.json?.messages) {
               const msgs = msgsRes.json.messages
               for (const msg of msgs) {
-                const messageId = msg.id || (msg.key && msg.key.id) || msg.messageid
+                const messageId = msg.messageid || msg.id || (msg.key && msg.key.id)
                 if (!messageId) continue
 
                 try {
@@ -194,26 +174,83 @@ routerAdd(
                   msg.messageTimestamp ||
                   msg.wa_timestamp ||
                   Math.floor(Date.now() / 1000)
-                let msgType = msg.messageType || msg.wa_type || msg.type || 'text'
-                let extractedText = extractMessageText(msg)
-                let msgBody = extractedText || `[${msgType}]`
+
+                let msgType = extractMessageType(msg)
+                let caption = extractCaption(msg)
+                let filename = extractFilename(msg)
 
                 let mediaUrl = ''
                 let mediaMimetype = ''
                 let mediaTranscription = ''
                 let mediaError = ''
-                let mediaType = ''
+                let mediaDownloadedAt = ''
 
-                if (isMediaMessage(msg, msgType)) {
-                  mediaType = msgType
-                  const mediaData = downloadMediaIfNeeded(baseUrl, token, messageId, msgType)
-                  if (mediaData.fileURL) {
-                    mediaUrl = mediaData.fileURL
-                    mediaMimetype = mediaData.mimetype || ''
-                    mediaTranscription = mediaData.transcription || ''
-                  } else if (mediaData.media_error) {
-                    mediaError = mediaData.media_error
+                const isMedia = isMediaMessage(msg, msgType)
+
+                if (isMedia) {
+                  $app.logger().info('mediaDetected', 'messageId', messageId, 'type', msgType)
+
+                  const isAudio = msgType === 'audio' || msgType === 'myaudio' || msgType === 'ptt'
+
+                  try {
+                    const dlBody = {
+                      id: messageId,
+                      return_link: true,
+                      return_base64: false,
+                      generate_mp3: true,
+                      download_quoted: false,
+                      transcribe: isAudio,
+                    }
+
+                    const res = $http.send({
+                      url: `${baseUrl}/message/download`,
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        token: token,
+                      },
+                      body: JSON.stringify(dlBody),
+                      timeout: 30,
+                    })
+
+                    if (res.statusCode !== 200) {
+                      mediaError = 'API returned status ' + res.statusCode
+                      $app
+                        .logger()
+                        .error('mediaFailed', 'messageId', messageId, 'status', res.statusCode)
+                    } else {
+                      const data = res.json || {}
+                      const responseData = data.data || data
+                      mediaUrl =
+                        responseData.fileURL || responseData.file_url || responseData.url || ''
+                      mediaMimetype = responseData.mimetype || ''
+                      mediaTranscription = responseData.transcription || responseData.text || ''
+
+                      if (mediaUrl) {
+                        mediaDownloadedAt = new Date().toISOString()
+                        $app
+                          .logger()
+                          .info('mediaDownloaded', 'messageId', messageId, 'url', mediaUrl)
+                      }
+                      if (mediaTranscription) {
+                        $app.logger().info('audioTranscribed', 'messageId', messageId)
+                      }
+                    }
+                  } catch (err) {
+                    mediaError = err.message || String(err)
+                    $app.logger().error('mediaFailed', 'messageId', messageId, 'error', mediaError)
                   }
+                }
+
+                let msgBody = caption
+                if (isMedia) {
+                  if (msgType === 'image') msgBody = caption || '[Imagem]'
+                  else if (msgType === 'document')
+                    msgBody = filename ? `[Documento: ${filename}]` : '[Documento]'
+                  else if (msgType === 'audio' || msgType === 'myaudio' || msgType === 'ptt')
+                    msgBody = mediaTranscription || '[Áudio]'
+                  else if (msgType === 'video' || msgType === 'ptv') msgBody = caption || '[Vídeo]'
+                  else if (msgType === 'sticker') msgBody = '[Sticker]'
                 }
 
                 let clientId = ''
@@ -241,7 +278,10 @@ routerAdd(
                 if (mediaMimetype) record.set('media_mimetype', mediaMimetype)
                 if (mediaTranscription) record.set('media_transcription', mediaTranscription)
                 if (mediaError) record.set('media_error', mediaError)
-                if (mediaType) record.set('media_type', mediaType)
+                if (isMedia) record.set('media_type', msgType)
+                if (caption) record.set('media_caption', caption)
+                if (filename) record.set('media_filename', filename)
+                if (mediaDownloadedAt) record.set('media_downloaded_at', mediaDownloadedAt)
 
                 $app.save(record)
 
@@ -265,18 +305,22 @@ routerAdd(
         instance.set('last_sync_at', new Date().toISOString())
         $app.save(instance)
 
-        console.log(
-          'totalChats:',
-          totalChats,
-          'totalMessagesSaved:',
-          totalMessagesSaved,
-          'totalDuplicates:',
-          totalDuplicates,
-        )
+        $app
+          .logger()
+          .info(
+            'WhatsApp sync completed',
+            'totalChats',
+            totalChats,
+            'totalMessagesSaved',
+            totalMessagesSaved,
+            'totalDuplicates',
+            totalDuplicates,
+          )
 
         return e.json(200, { ok: true, message: 'Sync completed' })
       }
     } catch (err) {
+      $app.logger().error('WhatsApp sync error', 'error', err.message)
       return e.badRequestError(err.message)
     }
   },
