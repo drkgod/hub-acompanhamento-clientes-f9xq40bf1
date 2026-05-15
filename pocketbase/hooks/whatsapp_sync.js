@@ -23,6 +23,11 @@ routerAdd(
       const baseUrl = instance.getString('base_url')
       const token = instance.getString('api_token')
 
+      let totalChats = 0
+      let totalMessagesSaved = 0
+      let totalDuplicates = 0
+      let historyRequested = 0
+
       const chatsRes = $http.send({
         url: `${baseUrl}/chat/find`,
         method: 'POST',
@@ -41,7 +46,8 @@ routerAdd(
         return e.badRequestError('Failed to fetch chats: ' + chatsRes.statusCode)
       }
 
-      const chats = chatsRes.json?.chats || chatsRes.json?.data || []
+      const chats = chatsRes.json?.chats || []
+      totalChats = chats.length
 
       if (requestHistory) {
         for (const chat of chats) {
@@ -58,9 +64,15 @@ routerAdd(
               body: JSON.stringify({ number: chatId, mode: 'history', count: 100 }),
               timeout: 10,
             })
+            historyRequested++
           } catch (_) {}
         }
-        return e.json(200, { ok: true, message: 'History sync requested' })
+        console.log('totalChats:', totalChats, 'historyRequested:', historyRequested)
+        return e.json(200, {
+          ok: true,
+          message:
+            'Histórico solicitado. As mensagens chegarão via webhook ou ficarão disponíveis em nova sincronização.',
+        })
       } else {
         const msgCol = $app.findCollectionByNameOrId('whatsapp_messages')
         const clients = $app.findRecordsByFilter('clients', `user_id = '${userId}'`, '', 1000, 0)
@@ -86,30 +98,33 @@ routerAdd(
               timeout: 15,
             })
 
-            if (msgsRes.statusCode === 200 && (msgsRes.json?.messages || msgsRes.json?.data)) {
-              const msgs = msgsRes.json.messages || msgsRes.json.data
+            if (msgsRes.statusCode === 200 && msgsRes.json?.messages) {
+              const msgs = msgsRes.json.messages
               for (const msg of msgs) {
-                const messageId = msg.id || msg.key?.id || msg.wa_messageid
+                const messageId = msg.id || (msg.key && msg.key.id) || msg.messageid
                 if (!messageId) continue
 
                 try {
                   $app.findFirstRecordByData('whatsapp_messages', 'message_id', messageId)
+                  totalDuplicates++
                   continue
                 } catch (_) {}
 
                 const phone = chatId.split('@')[0]
-                let fromMe = msg.fromMe || msg.key?.fromMe || msg.wa_isFromMe || false
+                let fromMe = msg.fromMe || (msg.key && msg.key.fromMe) || msg.wa_isFromMe || false
                 let timestamp =
                   msg.timestamp ||
                   msg.messageTimestamp ||
                   msg.wa_timestamp ||
                   Math.floor(Date.now() / 1000)
-                let msgType = msg.messageType || msg.wa_type || 'text'
+                let msgType = msg.messageType || msg.wa_type || msg.type || 'text'
                 let msgBody =
                   msg.text ||
-                  msg.wa_body ||
-                  msg.message?.conversation ||
-                  msg.message?.extendedTextMessage?.text ||
+                  msg.body ||
+                  (msg.message && msg.message.conversation) ||
+                  (msg.message &&
+                    msg.message.extendedTextMessage &&
+                    msg.message.extendedTextMessage.text) ||
                   `[${msgType}]`
 
                 let clientId = ''
@@ -133,10 +148,12 @@ routerAdd(
                 if (clientId) record.set('client_id', clientId)
                 record.set('raw_payload', msg)
                 $app.save(record)
+
+                totalMessagesSaved++
               }
 
               hasMore = msgsRes.json.hasMore === true
-              if (msgsRes.json.nextOffset) {
+              if (msgsRes.json.nextOffset !== undefined) {
                 offset = msgsRes.json.nextOffset
               } else {
                 offset += msgs.length
@@ -151,6 +168,15 @@ routerAdd(
 
         instance.set('last_sync_at', new Date().toISOString())
         $app.save(instance)
+
+        console.log(
+          'totalChats:',
+          totalChats,
+          'totalMessagesSaved:',
+          totalMessagesSaved,
+          'totalDuplicates:',
+          totalDuplicates,
+        )
 
         return e.json(200, { ok: true, message: 'Sync completed' })
       }
