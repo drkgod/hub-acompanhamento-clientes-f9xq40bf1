@@ -18,6 +18,7 @@ import NewMeeting from './pages/NewMeeting'
 import Integrations from './pages/Integrations'
 import Digest from './pages/Digest'
 import WhatsAppInbox from './pages/WhatsAppInbox'
+import SchemaPage from './pages/Schema'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -42,6 +43,7 @@ const App = () => (
                 <Route path="/nova-reuniao" element={<NewMeeting />} />
                 <Route path="/integrations" element={<Integrations />} />
                 <Route path="/digest" element={<Digest />} />
+                <Route path="/schema" element={<SchemaPage />} />
               </Route>
             </Route>
 

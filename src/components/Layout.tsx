@@ -7,6 +7,7 @@ import {
   Newspaper,
   MessageSquare,
   Settings,
+  Database,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
@@ -128,6 +129,18 @@ export default function Layout() {
               >
                 <Settings className="h-4 w-4" />
                 Integrações
+              </Link>
+              <Link
+                to="/schema"
+                className={cn(
+                  'px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2',
+                  location.pathname === '/schema'
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                )}
+              >
+                <Database className="h-4 w-4" />
+                Schema
               </Link>
             </nav>
           </div>
