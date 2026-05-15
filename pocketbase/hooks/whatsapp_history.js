@@ -41,7 +41,11 @@ routerAdd(
   '/backend/v1/whatsapp/conversations/{chatId}/messages',
   (e) => {
     try {
-      const chatId = e.request.pathValue('chatId')
+      let chatId = e.request.pathValue('chatId')
+      try {
+        chatId = decodeURIComponent(chatId)
+      } catch (_) {}
+
       const userId = e.auth?.id
       if (!userId) return e.unauthorizedError('Auth required')
 

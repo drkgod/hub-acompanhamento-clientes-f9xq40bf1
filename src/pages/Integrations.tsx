@@ -167,12 +167,11 @@ export default function Integrations() {
                 </li>
                 <li>
                   <span className="font-semibold text-slate-900">Sincronizar agora:</span> Importa
-                  conversas e mensagens que a UAZAPI já conhece. Use essa opção no Inbox.
+                  chats e mensagens que a UAZAPI já conhece localmente (Sync).
                 </li>
                 <li>
                   <span className="font-semibold text-slate-900">Buscar histórico antigo:</span>{' '}
-                  Solicita mensagens anteriores ao WhatsApp; o processo é assíncrono e as mensagens
-                  chegarão gradualmente via webhook.
+                  Solicita ao WhatsApp mensagens anteriores que chegarão via webhook.
                 </li>
               </ul>
             </div>

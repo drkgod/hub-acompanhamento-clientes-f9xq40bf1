@@ -8,7 +8,7 @@ cronAdd('monitor_inatividade', '0 0 * * *', () => {
     try {
       const msgs = $app.findRecordsByFilter(
         'whatsapp_messages',
-        `client_id = '${client.id}'`,
+        `client_id = '${client.id}' && from_me = false`,
         '-timestamp',
         1,
         0,

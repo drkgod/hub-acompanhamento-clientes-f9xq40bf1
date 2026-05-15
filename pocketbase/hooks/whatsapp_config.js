@@ -26,9 +26,9 @@ routerAdd(
       instance.set('api_token', apiToken)
       instance.set('instance_name', instanceName)
 
-      const pbUrl = $secrets.get('PB_INSTANCE_URL') || ''
-      const webhookUrl = `${pbUrl}/backend/v1/whatsapp-webhook`
+      const publicUrl = $secrets.get('SKIP_PUBLIC_URL') || $secrets.get('PB_INSTANCE_URL') || ''
       const webhookSecret = $secrets.get('UAZAPI_WEBHOOK_SECRET') || 'secret123'
+      const webhookUrl = `${publicUrl}/backend/v1/whatsapp-webhook?secret=${webhookSecret}`
 
       try {
         const res = $http.send({
@@ -43,7 +43,6 @@ routerAdd(
             url: webhookUrl,
             events: ['messages', 'messages_update', 'history', 'connection'],
             excludeMessages: ['wasSentByApi'],
-            headers: { token: webhookSecret },
           }),
           timeout: 10,
         })
@@ -88,7 +87,7 @@ routerAdd(
       let state = instance.getString('connection_status')
       try {
         const res = $http.send({
-          url: `${baseUrl}/instance/connection`,
+          url: `${baseUrl}/instance/status`,
           method: 'GET',
           headers: { token: token },
           timeout: 5,
