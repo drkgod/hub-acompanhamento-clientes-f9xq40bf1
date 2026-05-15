@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-15T19:49:39.669Z",
+  "generatedAt": "2026-05-15T20:28:39.096Z",
   "collections": [
     {
       "name": "users",
@@ -925,6 +925,54 @@
         {
           "name": "raw_payload",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_mimetype",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_filename",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_transcription",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_downloaded_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_caption",
+          "type": "text",
           "required": false,
           "system": false
         }
