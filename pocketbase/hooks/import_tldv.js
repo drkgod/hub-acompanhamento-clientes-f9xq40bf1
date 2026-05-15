@@ -24,7 +24,7 @@ routerAdd(
     let res
     try {
       res = $http.send({
-        url: `https://pasta.tldv.io/v1alpha1/meetings?participant_email=${encodeURIComponent(email)}`,
+        url: `https://pasta.tldv.io/v1alpha1/meetings`,
         method: 'GET',
         headers: { 'x-api-key': apiKey },
         timeout: 30,
@@ -35,36 +35,42 @@ routerAdd(
     }
 
     let meetingData = null
-    if (res.statusCode === 200 && res.json) {
-      if (Array.isArray(res.json) && res.json.length > 0) {
-        meetingData = res.json[0]
-      } else if (res.json.data && res.json.data.length > 0) {
-        meetingData = res.json.data[0]
-      }
+    if (
+      res.statusCode === 200 &&
+      res.json &&
+      Array.isArray(res.json.meetings) &&
+      res.json.meetings.length > 0
+    ) {
+      meetingData = res.json.meetings[0]
     }
 
     if (!meetingData) {
-      return e.notFoundError('No tl;dv recording found for this email')
+      return e.notFoundError(
+        'Nenhuma gravação encontrada na sua conta tl;dv. Verifique se você tem reuniões gravadas.',
+      )
     }
+
+    const currentUserEmail = e.auth ? e.auth.getString('email') : ''
+    let invitee = null
+    if (Array.isArray(meetingData.invitees)) {
+      invitee = meetingData.invitees.find((i) => i.email && i.email !== currentUserEmail)
+    }
+
+    const finalEmail = invitee && invitee.email ? invitee.email : email
+    const finalName = invitee && invitee.name ? invitee.name : finalEmail.split('@')[0]
 
     let client
     try {
       client = $app.findFirstRecordByFilter('clients', 'email = {:email} && user_id = {:userId}', {
-        email,
+        email: finalEmail,
         userId,
       })
     } catch (_) {
       const clientsCol = $app.findCollectionByNameOrId('clients')
       client = new Record(clientsCol)
-      client.set(
-        'nome',
-        meetingData.participant_name ||
-          meetingData.guest_name ||
-          meetingData.name ||
-          email.split('@')[0],
-      )
+      client.set('nome', finalName)
       client.set('empresa', meetingData.company || 'Empresa Importada')
-      client.set('email', email)
+      client.set('email', finalEmail)
       client.set('estagio_id', firstStage.id)
       client.set('user_id', userId)
       $app.save(client)
@@ -73,11 +79,8 @@ routerAdd(
     const meetingsCol = $app.findCollectionByNameOrId('meetings')
     const meeting = new Record(meetingsCol)
     meeting.set('client_id', client.id)
-    meeting.set('titulo', meetingData.name || meetingData.title || 'Reunião Importada (tl;dv)')
-    meeting.set(
-      'data',
-      meetingData.happenedAt || meetingData.created_at || new Date().toISOString(),
-    )
+    meeting.set('titulo', meetingData.name || 'Reunião Importada (tl;dv)')
+    meeting.set('data', meetingData.happenedAt || new Date().toISOString())
     meeting.set(
       'duracao_minutos',
       meetingData.duration ? Math.round(meetingData.duration / 60) : 30,
@@ -88,14 +91,39 @@ routerAdd(
     meeting.set('recording_id', meetingData.id || 'tldv_' + $security.randomString(8))
     $app.save(meeting)
 
+    let transcriptText = ''
+    if (meetingData.id) {
+      try {
+        const trRes = $http.send({
+          url: `https://pasta.tldv.io/v1alpha1/meetings/${meetingData.id}/transcript`,
+          method: 'GET',
+          headers: { 'x-api-key': apiKey },
+          timeout: 30,
+        })
+
+        if (trRes.statusCode === 200 && trRes.json) {
+          if (Array.isArray(trRes.json.data) && trRes.json.data.length > 0) {
+            transcriptText = trRes.json.data.map((seg) => `${seg.speaker}: ${seg.text}`).join('\n')
+          } else if (trRes.json.transcript) {
+            transcriptText = trRes.json.transcript
+          } else if (trRes.json.fullText) {
+            transcriptText = trRes.json.fullText
+          }
+        }
+      } catch (err) {
+        $app.logger().error('tl;dv API transcript error', 'error', err.message)
+      }
+    }
+
+    if (!transcriptText) {
+      transcriptText = 'Transcrição pendente de processamento pelo agente.'
+    }
+
     const transcriptsCol = $app.findCollectionByNameOrId('transcripts')
     const transcript = new Record(transcriptsCol)
     transcript.set('meeting_id', meeting.id)
     transcript.set('client_id', client.id)
-    transcript.set(
-      'texto_original',
-      meetingData.transcript || 'Transcrição importada pendente de processamento.',
-    )
+    transcript.set('texto_original', transcriptText)
     transcript.set('user_id', userId)
     $app.save(transcript)
 
