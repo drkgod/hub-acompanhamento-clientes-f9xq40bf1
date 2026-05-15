@@ -30,8 +30,48 @@ routerAdd(
       if (m.getString('client_id')) clientId = m.getString('client_id')
       const ts = m.getFloat('timestamp')
       if (ts > maxTimestamp) maxTimestamp = ts
-      const prefix = m.getBool('from_me') ? 'EU: ' : 'CLIENTE: '
-      return prefix + m.getString('body')
+
+      const sender = m.getBool('from_me') ? 'EU' : 'CLIENTE'
+      const body = m.getString('body')
+      const mediaError = m.getString('media_error')
+      const mediaUrl = m.getString('media_url')
+      const mediaType = m.getString('media_type') || m.getString('type')
+      const mediaCaption = m.getString('media_caption') || body
+      const mediaFilename = m.getString('media_filename')
+      const mediaMimetype = m.getString('media_mimetype')
+      const mediaTranscription = m.getString('media_transcription')
+
+      if (mediaError) {
+        return `${sender} enviou mídia, mas o download falhou: ${mediaError}`
+      }
+
+      if (mediaUrl || mediaTranscription) {
+        if (mediaType === 'image' || mediaType === 'sticker') {
+          if (mediaCaption) {
+            return `${sender} enviou uma imagem. Legenda: ${mediaCaption}. URL da imagem: ${mediaUrl}`
+          }
+          return `${sender} enviou uma imagem. URL da imagem: ${mediaUrl}`
+        }
+        if (mediaType === 'video' || mediaType === 'ptv') {
+          if (mediaCaption) {
+            return `${sender} enviou um vídeo. Legenda: ${mediaCaption}. URL: ${mediaUrl}`
+          }
+          return `${sender} enviou um vídeo. URL: ${mediaUrl}`
+        }
+        if (mediaType === 'document') {
+          return `${sender} enviou um documento chamado ${mediaFilename || 'desconhecido'}, tipo ${mediaMimetype || 'desconhecido'}, URL: ${mediaUrl}`
+        }
+        if (mediaType === 'audio' || mediaType === 'myaudio' || mediaType === 'ptt') {
+          if (mediaTranscription) {
+            return `${sender} enviou um áudio. Transcrição: ${mediaTranscription}`
+          }
+          return `${sender} enviou um áudio sem transcrição disponível. URL: ${mediaUrl}`
+        }
+
+        return `${sender} enviou mídia (${mediaType}). URL: ${mediaUrl}`
+      }
+
+      return `${sender}: ${body}`
     })
 
     const historyText = historyLines.join('\n\n')
