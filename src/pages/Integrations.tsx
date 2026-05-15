@@ -26,6 +26,7 @@ export default function Integrations() {
   const [tldvImporting, setTldvImporting] = useState(false)
   const [tldvImportProgress, setTldvImportProgress] = useState({ current: 0, total: 1 })
   const [tldvStats, setTldvStats] = useState({
+    processed_count: 0,
     created_clients: 0,
     created_meetings: 0,
     created_transcripts: 0,
@@ -155,6 +156,7 @@ export default function Integrations() {
     if (!tldvEmail) return
     setTldvImporting(true)
     setTldvStats({
+      processed_count: 0,
       created_clients: 0,
       created_meetings: 0,
       created_transcripts: 0,
@@ -172,6 +174,7 @@ export default function Integrations() {
           done: boolean
           next_page?: number
           pages?: number
+          processed_count?: number
           created_clients?: number
           created_meetings?: number
           created_transcripts?: number
@@ -183,6 +186,7 @@ export default function Integrations() {
         })
 
         setTldvStats((prev) => ({
+          processed_count: prev.processed_count + (res.processed_count || 0),
           created_clients: prev.created_clients + (res.created_clients || 0),
           created_meetings: prev.created_meetings + (res.created_meetings || 0),
           created_transcripts: prev.created_transcripts + (res.created_transcripts || 0),
@@ -506,28 +510,32 @@ export default function Integrations() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                     <div className="bg-background p-3 rounded border">
-                      <span className="text-muted-foreground block text-xs">Clientes criados</span>
+                      <span className="text-muted-foreground block text-xs">Total Processadas</span>
+                      <span className="font-semibold text-lg">{tldvStats.processed_count}</span>
+                    </div>
+                    <div className="bg-background p-3 rounded border">
+                      <span className="text-muted-foreground block text-xs">Clientes Criados</span>
                       <span className="font-semibold text-lg">{tldvStats.created_clients}</span>
                     </div>
                     <div className="bg-background p-3 rounded border">
-                      <span className="text-muted-foreground block text-xs">Reuniões criadas</span>
+                      <span className="text-muted-foreground block text-xs">Reuniões Criadas</span>
                       <span className="font-semibold text-lg">{tldvStats.created_meetings}</span>
                     </div>
                     <div className="bg-background p-3 rounded border">
                       <span className="text-muted-foreground block text-xs">
-                        Transcrição criadas
+                        Transcrição Criadas
                       </span>
                       <span className="font-semibold text-lg">{tldvStats.created_transcripts}</span>
                     </div>
                     <div className="bg-background p-3 rounded border">
                       <span className="text-muted-foreground block text-xs">
-                        Duplicadas ignoradas
+                        Duplicadas Ignoradas
                       </span>
                       <span className="font-semibold text-lg">{tldvStats.skipped_duplicates}</span>
                     </div>
                     <div className="bg-background p-3 rounded border">
                       <span className="text-muted-foreground block text-xs">
-                        Reuniões ignoradas
+                        Reuniões Ignoradas
                       </span>
                       <span className="font-semibold text-lg">
                         {tldvStats.skipped_not_involving_email}

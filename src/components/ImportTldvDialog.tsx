@@ -89,6 +89,7 @@ export function ImportTldvDialog() {
         const {
           page,
           pages,
+          processed_count,
           created_meetings,
           created_clients,
           skipped_duplicates,
@@ -98,7 +99,7 @@ export function ImportTldvDialog() {
 
         setBulkProgress((prev) => [
           ...prev,
-          `Página ${page}/${pages} concluída: ${created_meetings} reuniões criadas, ${created_clients} clientes criados, ${skipped_duplicates} duplicadas ignoradas.`,
+          `Página ${page}/${pages} concluída: ${processed_count} processadas, ${created_meetings} reuniões criadas, ${created_clients} clientes criados, ${skipped_duplicates} duplicadas ignoradas.`,
         ])
 
         if (done) {

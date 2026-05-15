@@ -150,40 +150,24 @@ routerAdd(
         })
       } catch (err) {}
 
-      let transcriptRecord = null
       if (meetingRecord) {
-        try {
-          transcriptRecord = $app.findFirstRecordByFilter('transcripts', `meeting_id = {:mId}`, {
-            mId: meetingRecord.id,
-          })
-        } catch (err) {}
-
-        const existingText = transcriptRecord ? transcriptRecord.getString('texto_original') : ''
-
-        // Skip entirely if we already have a real transcript text
-        if (
-          existingText &&
-          !existingText.startsWith('Transcrição ainda sendo') &&
-          !existingText.startsWith('Erro ao buscar')
-        ) {
-          skipped_duplicates++
-          continue
-        }
-      } else {
-        const mCol = $app.findCollectionByNameOrId('meetings')
-        meetingRecord = new Record(mCol)
-        meetingRecord.set('recording_id', meeting.id)
-        meetingRecord.set('client_id', clientRecord.id)
-        meetingRecord.set('titulo', meeting.name || 'Reunião tl;dv')
-        meetingRecord.set('data', meeting.happenedAt || '')
-        const durMins = meeting.duration ? Math.round(meeting.duration / 60) : 0
-        meetingRecord.set('duracao_minutos', durMins)
-        meetingRecord.set('plataforma', 'tl;dv')
-        meetingRecord.set('status', 'processando')
-        meetingRecord.set('user_id', userId)
-        $app.save(meetingRecord)
-        created_meetings++
+        skipped_duplicates++
+        continue
       }
+
+      const mCol = $app.findCollectionByNameOrId('meetings')
+      meetingRecord = new Record(mCol)
+      meetingRecord.set('recording_id', meeting.id)
+      meetingRecord.set('client_id', clientRecord.id)
+      meetingRecord.set('titulo', meeting.name || 'Reunião tl;dv')
+      meetingRecord.set('data', meeting.happenedAt || '')
+      const durMins = meeting.duration ? Math.round(meeting.duration / 60) : 0
+      meetingRecord.set('duracao_minutos', durMins)
+      meetingRecord.set('plataforma', 'tl;dv')
+      meetingRecord.set('status', 'processando')
+      meetingRecord.set('user_id', userId)
+      $app.save(meetingRecord)
+      created_meetings++
 
       // Transcript Processing
       const tUrl = `https://pasta.tldv.io/v1alpha1/meetings/${meeting.id}/transcript`
@@ -216,46 +200,22 @@ routerAdd(
             `... [Transcrição truncada. Texto completo tem ${origLen} caracteres.]`
         }
 
-        let isNewTranscript = false
-        let isExistingTextEmpty = false
-
-        if (!transcriptRecord) {
-          try {
-            transcriptRecord = $app.findFirstRecordByFilter('transcripts', `meeting_id = {:mId}`, {
-              mId: meetingRecord.id,
-            })
-          } catch (err) {}
-        }
-
-        if (!transcriptRecord) {
-          const trCol = $app.findCollectionByNameOrId('transcripts')
-          transcriptRecord = new Record(trCol)
-          transcriptRecord.set('meeting_id', meetingRecord.id)
-          transcriptRecord.set('client_id', clientRecord.id)
-          transcriptRecord.set('texto_original', transcriptText)
-          transcriptRecord.set('resumo', '')
-          transcriptRecord.set('user_id', userId)
-          $app.save(transcriptRecord)
-          created_transcripts++
-          isNewTranscript = true
-        } else {
-          const existingText = transcriptRecord.getString('texto_original')
-          isExistingTextEmpty =
-            !existingText ||
-            existingText.trim() === '' ||
-            existingText.startsWith('Transcrição ainda sendo') ||
-            existingText.startsWith('Erro ao buscar')
-
-          transcriptRecord.set('texto_original', transcriptText)
-          $app.save(transcriptRecord)
-        }
+        const trCol = $app.findCollectionByNameOrId('transcripts')
+        const transcriptRecord = new Record(trCol)
+        transcriptRecord.set('meeting_id', meetingRecord.id)
+        transcriptRecord.set('client_id', clientRecord.id)
+        transcriptRecord.set('texto_original', transcriptText)
+        transcriptRecord.set('resumo', '')
+        transcriptRecord.set('user_id', userId)
+        $app.save(transcriptRecord)
+        created_transcripts++
 
         const isCurrentPlaceholder =
           transcriptText.startsWith('Transcrição ainda sendo') ||
           transcriptText.startsWith('Erro ao buscar')
 
         // Trigger AI Agent to process the meeting only if necessary
-        if ((isNewTranscript || isExistingTextEmpty) && !isCurrentPlaceholder) {
+        if (!isCurrentPlaceholder) {
           try {
             const aiContext = JSON.stringify({
               client_id: clientRecord.id,
