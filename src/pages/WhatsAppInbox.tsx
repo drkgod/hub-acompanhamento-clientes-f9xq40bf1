@@ -14,12 +14,21 @@ import {
   RefreshCcw,
   History,
   Loader2,
+  Link2,
 } from 'lucide-react'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, isToday, isYesterday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import type { Client } from '@/types'
 
 interface Conversation {
   chat_id: string
@@ -52,7 +61,24 @@ export default function WhatsAppInbox() {
   const [requestHistory, setRequestHistory] = useState(false)
   const { toast } = useToast()
 
+  const [clients, setClients] = useState<Client[]>([])
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
+
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const loadClients = async () => {
+    try {
+      const res = await pb.collection('clients').getFullList<Client>({ sort: 'nome' })
+      setClients(res)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    loadClients()
+  }, [])
 
   const loadConversations = async () => {
     try {
@@ -74,6 +100,29 @@ export default function WhatsAppInbox() {
     loadConversations()
     if (selectedChatId) loadMessages(selectedChatId)
   })
+
+  const handleLinkClient = async (clientId: string) => {
+    if (!selectedConv) return
+    try {
+      await pb.send('/backend/v1/whatsapp/link-conversation', {
+        method: 'POST',
+        body: JSON.stringify({
+          chat_id: selectedConv.chat_id,
+          phone: selectedConv.phone,
+          client_id: clientId,
+        }),
+      })
+      toast({ title: 'Conversa vinculada com sucesso!' })
+      setIsLinkModalOpen(false)
+      loadConversations()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao vincular cliente',
+        description: err.message || 'Ocorreu um erro inesperado.',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const loadMessages = async (chatId: string) => {
     try {
@@ -254,7 +303,9 @@ export default function WhatsAppInbox() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline mb-0.5">
-                  <span className="font-semibold text-sm text-slate-800 truncate">{c.nome}</span>
+                  <span className="font-semibold text-sm text-slate-800 truncate">
+                    {c.nome || c.phone}
+                  </span>
                   <span className="text-xs text-slate-400 shrink-0 ml-2">
                     {formatMessageTime(c.ultima_mensagem_timestamp)}
                   </span>
@@ -312,7 +363,7 @@ export default function WhatsAppInbox() {
                   </div>
                 </div>
               </div>
-              {selectedConv.client_id && (
+              {selectedConv.client_id ? (
                 <Link
                   to={`/clientes/${selectedConv.client_id}`}
                   className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
@@ -320,6 +371,16 @@ export default function WhatsAppInbox() {
                   <UserIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">Ver Perfil</span>
                 </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsLinkModalOpen(true)}
+                  className="text-slate-700 bg-white shadow-sm flex items-center gap-2"
+                >
+                  <Link2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Vincular Cliente</span>
+                </Button>
               )}
             </header>
 
@@ -375,6 +436,61 @@ export default function WhatsAppInbox() {
           </div>
         )}
       </div>
+
+      <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Vincular Cliente</DialogTitle>
+            <DialogDescription>
+              Selecione o cliente para associar a esta conversa ({selectedConv?.phone}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Buscar por nome, email ou empresa..."
+                value={clientSearch}
+                onChange={(e) => setClientSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+              {clients
+                .filter(
+                  (c) =>
+                    c.nome.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    (c.email || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase()),
+                )
+                .map((client) => (
+                  <button
+                    key={client.id}
+                    onClick={() => handleLinkClient(client.id)}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{client.nome}</p>
+                      <p className="text-xs text-slate-500">
+                        {client.empresa || client.email || 'Sem empresa/email'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              {clients.filter(
+                (c) =>
+                  c.nome.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                  (c.email || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+                  (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase()),
+              ).length === 0 && (
+                <div className="text-center text-sm text-slate-500 py-4">
+                  Nenhum cliente encontrado.
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
